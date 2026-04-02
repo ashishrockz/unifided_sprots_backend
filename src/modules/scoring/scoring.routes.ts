@@ -434,7 +434,7 @@ scoringRoutes.post(
     const inn = m.innings.find((i: any) => i.status === "in_progress");
     if (!inn) throw new AppError(ERRORS.RESOURCE.INNINGS_NOT_FOUND);
     if (inn.totalBalls === 0 && inn.extras.total === 0) {
-      throw new AppError({ message: "No balls to undo", statusCode: 400 });
+      throw new AppError(ERRORS.BUSINESS.NO_BALLS_TO_UNDO);
     }
 
     /* ── Find the last ball: last over, last entry ────────── */
@@ -442,7 +442,7 @@ scoringRoutes.post(
     // Since we don't store individual ball history, we reverse the
     // last card-level update. We track via a `lastBall` snapshot.
     if (!(m as any).lastBallSnapshot) {
-      throw new AppError({ message: "Cannot undo — no snapshot available", statusCode: 400 });
+      throw new AppError(ERRORS.BUSINESS.NO_UNDO_SNAPSHOT);
     }
 
     const snap = (m as any).lastBallSnapshot;

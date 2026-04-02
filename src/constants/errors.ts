@@ -75,6 +75,8 @@ export const BUSINESS_ERRORS = Object.freeze({
   PLAN_REQUIRED:       def("BIZ_009", "Upgrade your plan to access this feature", 403),
   PLAN_EXPIRED:        def("BIZ_010", "Your subscription has expired", 403),
   SMS_LOGIN_DISABLED:  def("BIZ_011", "Mobile login is currently disabled", 403),
+  NO_BALLS_TO_UNDO:   def("BIZ_012", "No balls to undo", 400),
+  NO_UNDO_SNAPSHOT:   def("BIZ_013", "Cannot undo — no snapshot available", 400),
 });
 
 /* ════════════ ADMIN MANAGEMENT ════════════ */
