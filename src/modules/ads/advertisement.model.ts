@@ -1,0 +1,6 @@
+import { Schema, model, Document } from "mongoose";
+import { MEDIA_TYPES, SUB_PLANS } from "../../constants";
+export interface IAdvertisement extends Document { title: string; slot: string; mediaType: string; media: { primary: string; headsImage?: string; tailsImage?: string; sponsorLogo?: string }; clickUrl?: string; duration?: number; targetPlans: string[]; sportSlugs: string[]; isActive: boolean; priority: number; impressionCount: number; clickCount: number; startDate?: Date; endDate?: Date; }
+const s = new Schema<IAdvertisement>({ title: { type: String, required: true }, slot: { type: String, required: true }, mediaType: { type: String, enum: MEDIA_TYPES, required: true }, media: { primary: { type: String, required: true }, headsImage: String, tailsImage: String, sponsorLogo: String }, clickUrl: String, duration: Number, targetPlans: [{ type: String, enum: SUB_PLANS }], sportSlugs: [String], isActive: { type: Boolean, default: true }, priority: { type: Number, default: 0 }, impressionCount: { type: Number, default: 0 }, clickCount: { type: Number, default: 0 }, startDate: Date, endDate: Date }, { timestamps: true });
+s.index({ slot: 1, isActive: 1, priority: -1 });
+export const Advertisement = model<IAdvertisement>("Advertisement", s);
