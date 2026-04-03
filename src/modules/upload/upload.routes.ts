@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { authenticate, authorize } from "../../middleware/auth";
-import { uploadImage } from "../../middleware/upload";
+import { uploadImage, uploadMedia } from "../../middleware/upload";
 import { uploadToS3, deleteFromS3 } from "../../utils/s3";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { ok } from "../../utils/response";
@@ -25,10 +25,17 @@ uploadRoutes.post("/avatar", uploadImage, asyncHandler(async (req: AuthRequest, 
   ok(res, result, "Avatar uploaded");
 }));
 
-/** POST /upload/ad-media — Upload ad media (admin only) */
-uploadRoutes.post("/ad-media", authorize("super_admin", "content_manager"), uploadImage, asyncHandler(async (req: AuthRequest, res) => {
+/** POST /upload/ad-media — Upload ad media: image or video (admin only) */
+uploadRoutes.post("/ad-media", authorize("super_admin", "content_manager"), uploadMedia, asyncHandler(async (req: AuthRequest, res) => {
   if (!req.file) throw new AppError(ERRORS.UPLOAD.NO_FILE);
   const result = await uploadToS3(req.file, "ads");
+  ok(res, result, "Media uploaded");
+}));
+
+/** POST /upload/sport-media — Upload sport assets: image or video (admin only) */
+uploadRoutes.post("/sport-media", authorize("super_admin", "sport_admin"), uploadMedia, asyncHandler(async (req: AuthRequest, res) => {
+  if (!req.file) throw new AppError(ERRORS.UPLOAD.NO_FILE);
+  const result = await uploadToS3(req.file, "sports");
   ok(res, result, "Media uploaded");
 }));
 
