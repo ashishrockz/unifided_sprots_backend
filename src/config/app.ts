@@ -62,6 +62,10 @@ export function createApp() {
   }));
   app.get("/api-docs.json", (_req, res) => res.json(swaggerSpec));
 
+  /* ── Health check (Render uses GET / by default) ────── */
+  app.get("/", (_req, res) => res.json({ success: true, message: "Unified Sports API is running" }));
+  app.get("/health", (_req, res) => res.json({ success: true, uptime: process.uptime() }));
+
   app.use("/api/", apiLimiter);
 
   const v = "/api/v1";
