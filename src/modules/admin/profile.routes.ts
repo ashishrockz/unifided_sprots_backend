@@ -7,6 +7,8 @@ import { asyncHandler } from "../../utils/asyncHandler";
 import { ok } from "../../utils/response";
 import { AppError } from "../../utils/AppError";
 import { ERRORS, MSG } from "../../constants";
+import { uploadImage } from "../../middleware/upload";
+import { uploadToS3 } from "../../utils/s3";
 import type { AuthRequest } from "../../types";
 
 export const adminProfileRoutes = Router();
@@ -33,11 +35,13 @@ adminProfileRoutes.put("/me/password", asyncHandler(async (req: AuthRequest, res
   ok(res, null, MSG.UPDATED("Password"));
 }));
 
-/** POST /admin/me/avatar — Upload avatar (accepts base64 or URL for now) */
-adminProfileRoutes.post("/me/avatar", asyncHandler(async (req: AuthRequest, res) => {
+/** POST /admin/me/avatar — Upload avatar to S3 */
+adminProfileRoutes.post("/me/avatar", uploadImage, asyncHandler(async (req: AuthRequest, res) => {
+  if (!req.file) throw new AppError(ERRORS.UPLOAD.NO_FILE);
+  const { url } = await uploadToS3(req.file, "avatars");
   const user = await User.findByIdAndUpdate(
     req.user!.userId,
-    { avatar: req.body.avatar || req.body.url },
+    { avatar: url },
     { new: true },
   ).select("-password -__v");
   if (!user) throw new AppError(ERRORS.RESOURCE.USER_NOT_FOUND);

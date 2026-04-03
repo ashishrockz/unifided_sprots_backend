@@ -1,14 +1,41 @@
 import { Router } from "express";
 import { authenticate, authorize } from "../../middleware/auth";
+import { uploadImage } from "../../middleware/upload";
+import { uploadToS3, deleteFromS3 } from "../../utils/s3";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { ok } from "../../utils/response";
+import { AppError } from "../../utils/AppError";
+import { ERRORS } from "../../constants";
+import type { AuthRequest } from "../../types";
 
 export const uploadRoutes = Router();
-uploadRoutes.use(authenticate, authorize("super_admin", "content_manager"));
+uploadRoutes.use(authenticate);
 
-/** POST /upload/ad-media — Upload ad media (placeholder until S3/Cloudinary) */
-uploadRoutes.post("/ad-media", asyncHandler(async (req, res) => {
-  // For now, accept a URL in body. In production, use multer + cloud storage.
-  const url = req.body.url || req.body.media || "";
-  ok(res, { url, publicId: "local_" + Date.now(), resourceType: "image", format: "png" }, "Media uploaded");
+/** POST /upload/image — General image upload (any authenticated user) */
+uploadRoutes.post("/image", uploadImage, asyncHandler(async (req: AuthRequest, res) => {
+  if (!req.file) throw new AppError(ERRORS.UPLOAD.NO_FILE);
+  const result = await uploadToS3(req.file, "general");
+  ok(res, result, "Image uploaded");
+}));
+
+/** POST /upload/avatar — Upload user avatar */
+uploadRoutes.post("/avatar", uploadImage, asyncHandler(async (req: AuthRequest, res) => {
+  if (!req.file) throw new AppError(ERRORS.UPLOAD.NO_FILE);
+  const result = await uploadToS3(req.file, "avatars");
+  ok(res, result, "Avatar uploaded");
+}));
+
+/** POST /upload/ad-media — Upload ad media (admin only) */
+uploadRoutes.post("/ad-media", authorize("super_admin", "content_manager"), uploadImage, asyncHandler(async (req: AuthRequest, res) => {
+  if (!req.file) throw new AppError(ERRORS.UPLOAD.NO_FILE);
+  const result = await uploadToS3(req.file, "ads");
+  ok(res, result, "Media uploaded");
+}));
+
+/** DELETE /upload — Delete a file from S3 by key */
+uploadRoutes.delete("/", authorize("super_admin", "content_manager"), asyncHandler(async (req, res) => {
+  const { key } = req.body;
+  if (!key) throw new AppError(ERRORS.UPLOAD.MISSING_KEY);
+  await deleteFromS3(key);
+  ok(res, null, "File deleted");
 }));

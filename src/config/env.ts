@@ -20,6 +20,10 @@ const schema = z.object({
   CORS_ORIGINS:       z.string().default("http://localhost:5173"),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(900_000),
   RATE_LIMIT_MAX:     z.coerce.number().default(100),
+  AWS_ACCESS_KEY_ID:     z.string().default(""),
+  AWS_SECRET_ACCESS_KEY: z.string().default(""),
+  AWS_REGION:            z.string().default("ap-south-1"),
+  AWS_S3_BUCKET:         z.string().default("unified-sports-uploads"),
 });
 
 const parsed = schema.safeParse(process.env);

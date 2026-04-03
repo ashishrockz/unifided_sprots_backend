@@ -87,6 +87,14 @@ export const ADMIN_ERRORS = Object.freeze({
   USERNAME_TAKEN:      def("ADM_004", "Username is already taken", 409),
 });
 
+/* ════════════ UPLOAD ════════════ */
+export const UPLOAD_ERRORS = Object.freeze({
+  NO_FILE:       def("UPL_001", "No file provided", 400),
+  INVALID_TYPE:  def("UPL_002", "Only JPEG, PNG, WebP, GIF images are allowed", 400),
+  FILE_TOO_LARGE: def("UPL_003", "File size exceeds 5 MB limit", 400),
+  MISSING_KEY:   def("UPL_004", "File key is required", 400),
+});
+
 /* ════════════ SYSTEM ════════════ */
 export const SYSTEM_ERRORS = Object.freeze({
   INTERNAL:     def("SYS_001", "An unexpected error occurred", 500),
@@ -102,5 +110,6 @@ export const ERRORS = Object.freeze({
   CONFLICT:   CONFLICT_ERRORS,
   BUSINESS:   BUSINESS_ERRORS,
   ADMIN:      ADMIN_ERRORS,
+  UPLOAD:     UPLOAD_ERRORS,
   SYSTEM:     SYSTEM_ERRORS,
 });
