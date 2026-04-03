@@ -6,5 +6,5 @@ import rateLimit from "express-rate-limit";
 import { env } from "../config/env";
 const msg = (m: string) => ({ success: false, message: m });
 export const apiLimiter  = rateLimit({ windowMs: env.RATE_LIMIT_WINDOW_MS, max: env.RATE_LIMIT_MAX, message: msg("Too many requests") });
-export const authLimiter = rateLimit({ windowMs: 600_000, max: 10, message: msg("Too many auth attempts") });
-export const otpLimiter  = rateLimit({ windowMs: 600_000, max: 3, message: msg("OTP rate limit exceeded") });
+export const authLimiter = rateLimit({ windowMs: 600_000, max: 100, message: msg("Too many auth attempts") });
+export const otpLimiter  = rateLimit({ windowMs: 600_000, max: 100, message: msg("OTP rate limit exceeded") });
