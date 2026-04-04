@@ -42,6 +42,7 @@ import { otpConfigRoutes } from "../modules/admin/otpConfig.routes";
 /* ── New modules ──────────────────────────────────────── */
 import { auditLogRoutes } from "../modules/audit-logs/auditLog.routes";
 import { adminPlansRoutes, superAdminPlansRoutes } from "../modules/plans/plans.routes";
+import { publicPlansRoutes } from "../modules/plans/publicPlans.routes";
 import { adminSubscriptionsRoutes } from "../modules/subscriptions/subscriptions.routes";
 import { adminOrdersRoutes, adminRevenueRoutes } from "../modules/orders/orders.routes";
 import { uploadRoutes } from "../modules/upload/upload.routes";
@@ -94,6 +95,7 @@ export function createApp() {
   app.use(v + "/profile", profileRoutes);
   app.use(v + "/ads", userAdsRoutes);
   app.use(v + "/app", appConfigRoutes);
+  app.use(v, publicPlansRoutes);
 
   /* ── Admin core ───────────────────────────────────────── */
   app.use(v + "/admin/ads", adminAdsRoutes);
