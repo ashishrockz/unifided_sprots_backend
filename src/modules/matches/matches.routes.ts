@@ -51,8 +51,8 @@ sportMatchRoutes.post(
       creator: uid,
       matchConfig: req.body.matchConfig,
       teams: [
-        { name: "Team 1", players: [{ user: uid, role: "batsman", isGuest: false }], battingOrder: [], bowlingOrder: [] },
-        { name: "Team 2", players: [], battingOrder: [], bowlingOrder: [] },
+        { name: req.body.team1Name || "Team 1", players: [{ user: uid, role: "batsman", isGuest: false }], battingOrder: [], bowlingOrder: [] },
+        { name: req.body.team2Name || "Team 2", players: [], battingOrder: [], bowlingOrder: [] },
       ],
     };
     // Store location if provided (lat/lng from mobile)
