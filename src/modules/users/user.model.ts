@@ -24,7 +24,7 @@ const schema = new Schema<IUser>({
   mobile:      { type: String, unique: true, sparse: true, trim: true },
   password:    { type: String, select: false },
   avatar:      String, displayName: { type: String, trim: true, maxlength: 50 },
-  bio:         { type: String, trim: true, maxlength: 250 }, country: { type: String, maxlength: 2 },
+  bio:         { type: String, trim: true, maxlength: 250 }, country: { type: String, maxlength: 5 },
   isActive:    { type: Boolean, default: true },
   role:        { type: String, enum: USER_ROLES, default: "user" },
   adminRole:   { type: String, enum: [...ADMIN_ROLES, null], default: null },

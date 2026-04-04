@@ -44,7 +44,7 @@ sportMatchRoutes.post(
       throw new AppError(ERRORS.CONFLICT.PLAYER_IN_MATCH);
     const sport = await SportType.findOne({ slug, isActive: true });
     if (!sport) throw new AppError(ERRORS.RESOURCE.SPORT_NOT_FOUND);
-    const m = await Match.create({
+    const matchData: any = {
       title: req.body.title,
       sportType: sport._id,
       sportSlug: slug,
@@ -54,7 +54,15 @@ sportMatchRoutes.post(
         { name: "Team 1", players: [], battingOrder: [], bowlingOrder: [] },
         { name: "Team 2", players: [], battingOrder: [], bowlingOrder: [] },
       ],
-    });
+    };
+    // Store location if provided (lat/lng from mobile)
+    if (req.body.latitude && req.body.longitude) {
+      matchData.location = {
+        type: "Point",
+        coordinates: [+req.body.longitude, +req.body.latitude],
+      };
+    }
+    const m = await Match.create(matchData);
     created(res, m, MSG.CREATED("Match"));
   }),
 );
@@ -70,6 +78,16 @@ sportMatchRoutes.get(
         { creator: req.user.userId },
         { "teams.players.user": req.user.userId },
       ];
+    }
+    // Nearby matches: ?lat=X&lng=Y&radius=Z (km, default 50)
+    if (req.query.lat && req.query.lng) {
+      const radiusKm = +(req.query.radius || 50);
+      q.location = {
+        $near: {
+          $geometry: { type: "Point", coordinates: [+req.query.lng, +req.query.lat] },
+          $maxDistance: radiusKm * 1000,
+        },
+      };
     }
     const [d, t] = await Promise.all([
       Match.find(q)

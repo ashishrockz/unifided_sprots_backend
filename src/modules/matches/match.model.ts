@@ -12,6 +12,7 @@ export interface IMatch extends Document {
   matchConfig: Record<string, any>; toss?: any; innings: any[];
   winner?: number; result?: any; awards: any[];
   abandonReason?: string; abandonedBy?: string;
+  location?: { type: string; coordinates: number[] };
   lastActivityAt: Date; inactivityLimit: number;
   lastBallSnapshot?: any;
   startedAt?: Date; completedAt?: Date;
@@ -35,9 +36,14 @@ const ms = new Schema<IMatch>({
   innings: [innS], winner: Number, result: { type: { type: String }, margin: Number, description: String },
   awards: [{ type: { type: String }, player: Schema.Types.ObjectId, stats: Schema.Types.Mixed }],
   abandonReason: String, abandonedBy: { type: String, enum: ["admin", "creator", "system", null] },
+  location: {
+    type: { type: String, enum: ["Point"], default: "Point" },
+    coordinates: { type: [Number], default: [0, 0] },
+  },
   lastActivityAt: { type: Date, default: Date.now }, inactivityLimit: { type: Number, default: 30 },
   lastBallSnapshot: { type: Schema.Types.Mixed, default: null },
   startedAt: Date, completedAt: Date,
 }, { timestamps: true });
 ms.index({ sportSlug: 1, status: 1 }); ms.index({ creator: 1 }); ms.index({ "teams.players.user": 1, status: 1 });
+ms.index({ location: "2dsphere" });
 export const Match = model<IMatch>("Match", ms);

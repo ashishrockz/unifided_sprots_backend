@@ -59,8 +59,8 @@ profileRoutes.put(
   authenticate,
   validate(updateProfileSchema),
   asyncHandler(async (req: AuthRequest, res) => {
-    /* Whitelist only safe-to-update fields */
-    const allowed = ["displayName", "bio", "avatar", "country", "profileVisibility"];
+    /* Whitelist safe-to-update fields (username/email/mobile allowed for onboarding) */
+    const allowed = ["displayName", "username", "email", "mobile", "bio", "avatar", "country", "profileVisibility"];
     const updates: Record<string, any> = {};
 
     for (const key of allowed) {
