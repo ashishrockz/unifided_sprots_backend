@@ -104,10 +104,24 @@ sportMatchRoutes.get(
 sportMatchRoutes.get(
   "/:slug/matches/:matchId",
   asyncHandler(async (req, res) => {
+    // First get the raw doc to preserve guest user ObjectIds
+    const raw = await Match.findById(req.params.matchId).lean();
+    if (!raw) throw new AppError(ERRORS.RESOURCE.MATCH_NOT_FOUND);
+    // Then populate
     const m = await Match.findById(req.params.matchId)
       .populate("creator", "username displayName avatar")
-      .populate("teams.players.user", "username displayName avatar");
-    if (!m) throw new AppError(ERRORS.RESOURCE.MATCH_NOT_FOUND);
+      .populate("teams.players.user", "username displayName avatar")
+      .lean();
+    // Restore guest player user IDs (populate sets them to null)
+    if (m) {
+      for (let ti = 0; ti < m.teams.length; ti++) {
+        for (let pi = 0; pi < m.teams[ti].players.length; pi++) {
+          if (m.teams[ti].players[pi].user === null && raw.teams[ti]?.players[pi]?.user) {
+            m.teams[ti].players[pi].user = raw.teams[ti].players[pi].user;
+          }
+        }
+      }
+    }
     ok(res, m, MSG.FETCHED("Match"));
   }),
 );
