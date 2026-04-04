@@ -51,7 +51,7 @@ sportMatchRoutes.post(
       creator: uid,
       matchConfig: req.body.matchConfig,
       teams: [
-        { name: "Team 1", players: [], battingOrder: [], bowlingOrder: [] },
+        { name: "Team 1", players: [{ user: uid, role: "batsman", isGuest: false }], battingOrder: [], bowlingOrder: [] },
         { name: "Team 2", players: [], battingOrder: [], bowlingOrder: [] },
       ],
     };
@@ -167,6 +167,42 @@ matchRoutes.post(
     ok(res, m, MSG.PLAYERS_ADDED);
   }),
 );
+/** DELETE /:matchId/players/:playerId — Remove a player from a team */
+matchRoutes.delete(
+  "/:matchId/players/:playerId",
+  asyncHandler(async (req: any, res) => {
+    const m = await Match.findOne({
+      _id: req.params.matchId,
+      creator: req.user!.userId,
+    });
+    if (!m) throw new AppError(ERRORS.RESOURCE.MATCH_NOT_FOUND);
+    if (!["draft", "team_setup"].includes(m.status))
+      throw new AppError(ERRORS.BUSINESS.MATCH_NOT_READY);
+    const pid = req.params.playerId;
+    let removed = false;
+    for (const team of m.teams) {
+      const idx = team.players.findIndex(
+        (p: any) => p.user?.toString() === pid,
+      );
+      if (idx !== -1) {
+        team.players.splice(idx, 1);
+        // Clear captain/keeper if removed player held the role
+        if (team.captain?.toString() === pid) team.captain = undefined;
+        if (team.wicketkeeper?.toString() === pid) team.wicketkeeper = undefined;
+        removed = true;
+        break;
+      }
+    }
+    // Also remove from guest list if applicable
+    m.guestPlayers = m.guestPlayers.filter(
+      (g: any) => g._id?.toString() !== pid,
+    );
+    if (!removed) throw new AppError(ERRORS.RESOURCE.USER_NOT_FOUND);
+    await m.save();
+    ok(res, m, MSG.UPDATED("Team"));
+  }),
+);
+
 matchRoutes.put(
   "/:matchId/teams/:ti/captain",
   asyncHandler(async (req: any, res) => {
