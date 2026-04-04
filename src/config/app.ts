@@ -44,7 +44,9 @@ import { auditLogRoutes } from "../modules/audit-logs/auditLog.routes";
 import { adminPlansRoutes, superAdminPlansRoutes } from "../modules/plans/plans.routes";
 import { publicPlansRoutes } from "../modules/plans/publicPlans.routes";
 import { adminSubscriptionsRoutes } from "../modules/subscriptions/subscriptions.routes";
+import { userSubscriptionsRoutes } from "../modules/subscriptions/userSubscriptions.routes";
 import { adminOrdersRoutes, adminRevenueRoutes } from "../modules/orders/orders.routes";
+import { userOrdersRoutes } from "../modules/orders/userOrders.routes";
 import { uploadRoutes } from "../modules/upload/upload.routes";
 
 export function createApp() {
@@ -96,6 +98,8 @@ export function createApp() {
   app.use(v + "/ads", userAdsRoutes);
   app.use(v + "/app", appConfigRoutes);
   app.use(v, publicPlansRoutes);
+  app.use(v + "/orders", userOrdersRoutes);
+  app.use(v + "/subscriptions", userSubscriptionsRoutes);
 
   /* ── Admin core ───────────────────────────────────────── */
   app.use(v + "/admin/ads", adminAdsRoutes);

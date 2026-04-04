@@ -50,6 +50,9 @@ export const RESOURCE_ERRORS = Object.freeze({
   AD_NOT_FOUND:             def("RES_006", "Advertisement not found", 404),
   CONFIG_NOT_FOUND:         def("RES_007", "Configuration not found", 404),
   INNINGS_NOT_FOUND:        def("RES_008", "No active innings found", 404),
+  PLAN_NOT_FOUND:           def("RES_009", "Plan not found", 404),
+  ORDER_NOT_FOUND:          def("RES_010", "Order not found", 404),
+  MATCH_PACK_NOT_FOUND:     def("RES_011", "Match pack not found", 404),
 });
 
 /* ════════════ CONFLICT / DUPLICATE ════════════ */
@@ -60,6 +63,7 @@ export const CONFLICT_ERRORS = Object.freeze({
   SELF_REQUEST:      def("CON_004", "Cannot send request to yourself", 409),
   PLAYER_IN_MATCH:   def("CON_005", "Player is already in an active match", 409),
   PLAYER_IN_TEAM:    def("CON_006", "Player is already in this match", 409),
+  ALREADY_PAID:      def("CON_007", "Payment has already been verified", 409),
 });
 
 /* ════════════ BUSINESS RULES ════════════ */
