@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { Match } from "./match.model";
 import { SportType } from "../sports/sportType.model";
-import { authenticate } from "../../middleware/auth";
+import { authenticate, optionalAuth } from "../../middleware/auth";
 import { validate } from "../../middleware/validate";
 import { asyncHandler } from "../../utils/asyncHandler";
 import {
@@ -60,10 +60,17 @@ sportMatchRoutes.post(
 );
 sportMatchRoutes.get(
   "/:slug/matches",
-  asyncHandler(async (req, res) => {
+  optionalAuth,
+  asyncHandler(async (req: any, res) => {
     const { page, limit, skip } = parseQuery(req.query);
     const q: any = { sportSlug: req.params.slug };
     if (req.query.status) q.status = req.query.status;
+    if (req.query.mine === "true" && req.user?.userId) {
+      q.$or = [
+        { creator: req.user.userId },
+        { "teams.players.user": req.user.userId },
+      ];
+    }
     const [d, t] = await Promise.all([
       Match.find(q)
         .populate("creator", "username displayName avatar")
