@@ -300,11 +300,11 @@ matchRoutes.post(
     const m = await Match.findById(req.params.matchId);
     if (!m) throw new AppError(ERRORS.RESOURCE.MATCH_NOT_FOUND);
     const e: string[] = [];
+    const minPlayers = 2;
     m.teams.forEach((t: any, i: number) => {
-      if (!t.captain) e.push("Team " + (i + 1) + ": no captain");
-      if (!t.wicketkeeper) e.push("Team " + (i + 1) + ": no keeper");
-      if (t.players.length < (m.matchConfig?.playersPerTeam || 2))
-        e.push("Team " + (i + 1) + ": need more players");
+      const name = t.name || `Team ${i + 1}`;
+      if (t.players.length < minPlayers)
+        e.push(`${name}: needs at least ${minPlayers} players (has ${t.players.length})`);
     });
     ok(res, { valid: e.length === 0, errors: e }, MSG.TEAM_VALIDATED);
   }),
