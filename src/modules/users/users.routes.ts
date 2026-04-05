@@ -82,6 +82,33 @@ profileRoutes.put(
 );
 
 /**
+ * GET /profile/search?q=term
+ * @desc    Search all users by username or displayName.
+ * @access  Private (User)
+ */
+profileRoutes.get(
+  "/search",
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res) => {
+    const q = (req.query.q as string || "").trim();
+    if (!q || q.length < 2) {
+      ok(res, [], MSG.LIST("Users"));
+      return;
+    }
+    const regex = { $regex: q, $options: "i" };
+    const users = await User.find({
+      _id: { $ne: req.user?.userId },
+      isActive: true,
+      $or: [{ username: regex }, { displayName: regex }],
+    })
+      .select("username displayName avatar totalMatchesAllSports totalWinsAllSports")
+      .limit(20)
+      .lean();
+    ok(res, users, MSG.LIST("Users"));
+  })
+);
+
+/**
  * GET /profile/:userId
  * @desc    View another user's public profile.
  *          Respects profileVisibility settings.
