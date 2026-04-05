@@ -22,6 +22,10 @@ export const createMatchSchema = z.object({
     .min(2, "Title must be at least 2 characters")
     .max(100, "Title must be at most 100 characters")
     .trim(),
+  team1Name: z.string().max(30).trim().optional(),
+  team2Name: z.string().max(30).trim().optional(),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
   matchConfig: z.object({
     totalOvers: z.number().int().min(1).max(50).optional(),
     playersPerTeam: z.number().int().min(1).max(15).optional(),
@@ -41,6 +45,7 @@ export const addPlayersSchema = z.object({
     .array(z.string().min(1))
     .min(1, "At least one player ID required")
     .max(15),
+  isTwoSider: z.boolean().optional(),
 });
 
 /** POST /matches/:matchId/players/guest — Add a guest player */
