@@ -13,3 +13,4 @@ export function initSocket(http:HttpServer):Server{
 export const getIO=()=>io;
 export const emitToMatch=(id:string,ev:string,d:any)=>io?.to("match:"+id).emit(ev,d);
 export const emitToUser=(id:string,ev:string,d:any)=>io?.to("user:"+id).emit(ev,d);
+export const broadcastAll=(ev:string,d:any)=>io?.emit(ev,d);

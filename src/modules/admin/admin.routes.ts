@@ -14,13 +14,15 @@ import { asyncHandler } from "../../utils/asyncHandler";
 import { ok, paginated, buildPage, parseQuery } from "../../utils/response";
 import { AppError } from "../../utils/AppError";
 import { ERRORS, MSG } from "../../constants";
-import { emitToMatch } from "../../socket";
+import { emitToMatch, broadcastAll } from "../../socket";
+import { getRedis } from "../../config/redis";
 import { SOCKET_EVENTS } from "../../constants";
 import {
   updateConfigSchema,
   adminAbandonSchema,
   featureToggleSchema,
   updateSubscriptionSchema,
+  maintenanceSchema,
 } from "./admin.validation";
 
 export const adminRoutes = Router();
@@ -38,6 +40,21 @@ adminRoutes.get("/config/features", permit("config:features"), asyncHandler(asyn
 adminRoutes.put("/config/features/:key", permit("config:features"), validate(featureToggleSchema), asyncHandler(async (req, res) => {
   const c = await SystemConfig.findOneAndUpdate({ key: req.params.key, category: "features" }, { value: req.body.value }, { upsert: true, new: true });
   ok(res, c, MSG.CONFIG_UPDATED);
+}));
+
+/* ═══════ MAINTENANCE MODE ═══════ */
+adminRoutes.post("/config/maintenance", permit("config:maintenance"), validate(maintenanceSchema), asyncHandler(async (req, res) => {
+  const { active, message } = req.body;
+  const redis = getRedis();
+  if (active) {
+    await redis.set("config:maintenance_mode", "true");
+    if (message) await redis.set("config:maintenance_message", message);
+  } else {
+    await redis.del("config:maintenance_mode");
+    await redis.del("config:maintenance_message");
+  }
+  broadcastAll(SOCKET_EVENTS.MAINTENANCE_TOGGLED, { active, message: message || null });
+  ok(res, { active, message: message || null }, MSG.MAINTENANCE(active));
 }));
 
 /* ═══════ USERS ═══════ */

@@ -6,6 +6,7 @@ import { optionalAuth } from "../../middleware/auth";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { ok } from "../../utils/response";
 import { MSG } from "../../constants";
+import { getRedis } from "../../config/redis";
 
 export const appConfigRoutes = Router();
 appConfigRoutes.get(
@@ -38,6 +39,11 @@ appConfigRoutes.get(
     const smsDoc = await SystemConfig.findOne({ key: "sms_enabled" }).lean();
     const smsLoginEnabled = smsDoc?.value === true || smsDoc?.value === "true";
 
+    /* Check maintenance mode from Redis */
+    const redis = getRedis();
+    const maintenanceMode = (await redis.get("config:maintenance_mode")) === "true";
+    const maintenanceMessage = maintenanceMode ? await redis.get("config:maintenance_message") : null;
+
     ok(
       res,
       {
@@ -47,6 +53,8 @@ appConfigRoutes.get(
         features: fm,
         defaults: dm,
         smsLoginEnabled,
+        maintenanceMode,
+        maintenanceMessage,
       },
       MSG.FETCHED("Config"),
     );

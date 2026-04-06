@@ -64,6 +64,9 @@ export const CONFLICT_ERRORS = Object.freeze({
   PLAYER_IN_MATCH:   def("CON_005", "Player is already in an active match", 409),
   PLAYER_IN_TEAM:    def("CON_006", "Player is already in this match", 409),
   ALREADY_PAID:      def("CON_007", "Payment has already been verified", 409),
+  DUPLICATE_USERNAME: def("CON_008", "Username already taken", 409),
+  DUPLICATE_EMAIL:    def("CON_009", "Email already in use", 409),
+  DUPLICATE_MOBILE:   def("CON_010", "Mobile number already in use", 409),
 });
 
 /* ════════════ BUSINESS RULES ════════════ */

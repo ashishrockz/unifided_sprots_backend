@@ -69,6 +69,20 @@ profileRoutes.put(
       }
     }
 
+    /* ── Check uniqueness for username / email / mobile ── */
+    if (updates.username) {
+      const taken = await User.findOne({ username: updates.username, _id: { $ne: req.user?.userId } });
+      if (taken) throw new AppError(ERRORS.CONFLICT.DUPLICATE_USERNAME);
+    }
+    if (updates.email) {
+      const taken = await User.findOne({ email: updates.email, _id: { $ne: req.user?.userId } });
+      if (taken) throw new AppError(ERRORS.CONFLICT.DUPLICATE_EMAIL);
+    }
+    if (updates.mobile) {
+      const taken = await User.findOne({ mobile: updates.mobile, _id: { $ne: req.user?.userId } });
+      if (taken) throw new AppError(ERRORS.CONFLICT.DUPLICATE_MOBILE);
+    }
+
     const user = await User.findByIdAndUpdate(
       req.user?.userId,
       { $set: updates },

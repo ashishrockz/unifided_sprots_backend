@@ -7,6 +7,7 @@ import swaggerUi from "swagger-ui-express";
 import { env } from "./env";
 import { apiLimiter } from "../middleware/rateLimiter";
 import { errorHandler } from "../middleware/errorHandler";
+import { maintenanceCheck } from "../middleware/maintenance";
 import { swaggerSpec } from "../swagger/config";
 
 /* ── Auth ─────────────────────────────────────────────── */
@@ -81,6 +82,16 @@ export function createApp() {
     req.url = "/login";
     adminAuthRoutes(req, res, next);
   });
+
+  /* ── Maintenance gate (blocks user routes when active) ── */
+  app.use(v + "/friends", maintenanceCheck);
+  app.use(v + "/sports", maintenanceCheck);
+  app.use(v + "/matches", maintenanceCheck);
+  app.use(v + "/notifications", maintenanceCheck);
+  app.use(v + "/profile", maintenanceCheck);
+  app.use(v + "/ads", maintenanceCheck);
+  app.use(v + "/orders", maintenanceCheck);
+  app.use(v + "/subscriptions", maintenanceCheck);
 
   /* ── User-facing ──────────────────────────────────────── */
   app.use(v + "/friends", friendsRoutes);

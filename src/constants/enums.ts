@@ -34,4 +34,5 @@ export const SOCKET_EVENTS    = Object.freeze({
   CONFIG_UPDATED: "config:updated",
   NOTIFICATION_NEW: "notification:new",
   NOTIFICATION_UNREAD: "notification:unread_count",
+  MAINTENANCE_TOGGLED: "maintenance:toggled",
 });
