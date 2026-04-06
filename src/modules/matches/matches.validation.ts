@@ -118,6 +118,14 @@ export const recordBallSchema = z.object({
     })
     .optional(),
   shotType: z.string().max(30).optional(),
+  nextBatsmanId: z.string().min(1).optional(),
+});
+
+/** POST /matches/:matchId/innings/setup — Select opening pair + bowler */
+export const inningsSetupSchema = z.object({
+  openerId1: z.string().min(1, "Striker is required"),
+  openerId2: z.string().min(1, "Non-striker is required"),
+  bowlerId: z.string().min(1).optional(),
 });
 
 /** POST /matches/:matchId/abandon */

@@ -13,10 +13,59 @@ import { asyncHandler } from "../../utils/asyncHandler";
 import { ok } from "../../utils/response";
 import { AppError } from "../../utils/AppError";
 import { ERRORS, MSG, SOCKET_EVENTS } from "../../constants";
-import { recordBallSchema } from "../matches/matches.validation";
+import { recordBallSchema, inningsSetupSchema } from "../matches/matches.validation";
 import { emitToMatch } from "../../socket";
 
 export const scoringRoutes = Router();
+
+/* ═══════════════════════════════════════════════════════════
+   POST /:matchId/innings/setup — Select opening pair + bowler
+   ═══════════════════════════════════════════════════════════ */
+scoringRoutes.post(
+  "/:matchId/innings/setup",
+  authenticate,
+  validate(inningsSetupSchema),
+  asyncHandler(async (req: any, res) => {
+    const m = await Match.findById(req.params.matchId);
+    if (!m) throw new AppError(ERRORS.RESOURCE.MATCH_NOT_FOUND);
+    if (m.status !== "live") throw new AppError({ message: "Match is not live", statusCode: 400, code: "MATCH_NOT_LIVE" });
+
+    const inn = m.innings[m.innings.length - 1];
+    if (!inn) throw new AppError({ message: "No active innings", statusCode: 400, code: "NO_INNINGS" });
+    if (inn.totalBalls > 0) throw new AppError({ message: "Cannot change openers after first ball", statusCode: 400, code: "INNINGS_STARTED" });
+
+    const { openerId1, openerId2, bowlerId } = req.body;
+
+    if (openerId1 === openerId2) throw new AppError({ message: "Opener 1 and 2 must be different players", statusCode: 400, code: "SAME_OPENER" });
+
+    // Reset all batsmen to yet_to_bat
+    for (const b of inn.batting) {
+      b.status = "yet_to_bat";
+    }
+
+    // Set openers
+    const opener1 = inn.batting.find((b: any) => b.playerId?.toString() === openerId1);
+    const opener2 = inn.batting.find((b: any) => b.playerId?.toString() === openerId2);
+
+    if (!opener1) throw new AppError({ message: "Opener 1 not found in batting lineup", statusCode: 400, code: "PLAYER_NOT_FOUND" });
+    if (!opener2) throw new AppError({ message: "Opener 2 not found in batting lineup", statusCode: 400, code: "PLAYER_NOT_FOUND" });
+
+    opener1.status = "batting";
+    opener2.status = "batting";
+    inn.currentBatsman = openerId1;
+    inn.currentNonStriker = openerId2;
+
+    // Set bowler if provided
+    if (bowlerId) {
+      (inn as any).currentBowler = bowlerId;
+    }
+
+    m.lastActivityAt = new Date();
+    await m.save();
+
+    ok(res, m, "Innings setup complete");
+  }),
+);
 
 /* ═══════════════════════════════════════════════════════════
    POST /:matchId/score — Record a ball
@@ -110,8 +159,24 @@ scoringRoutes.post(
         batsmanName: d?.playerName, batsmanRuns: d?.runs,
         bowler: p.bowlerId, dismissalType: p.wicket.type,
       });
-      const nx = inn.batting.find((b: any) => b.status === "yet_to_bat");
-      if (nx) nx.status = "batting";
+      // Promote next batsman — user-selected or first yet_to_bat
+      let nx: any = null;
+      if (p.nextBatsmanId) {
+        nx = inn.batting.find((b: any) => b.playerId?.toString() === p.nextBatsmanId && b.status === "yet_to_bat");
+      }
+      if (!nx) {
+        nx = inn.batting.find((b: any) => b.status === "yet_to_bat");
+      }
+      if (nx) {
+        nx.status = "batting";
+        // Update currentBatsman or currentNonStriker based on who was dismissed
+        const dismissedId = p.wicket.dismissedBatsman;
+        if (inn.currentBatsman?.toString() === dismissedId) {
+          inn.currentBatsman = nx.playerId;
+        } else if (inn.currentNonStriker?.toString() === dismissedId) {
+          inn.currentNonStriker = nx.playerId;
+        }
+      }
 
       /* Emit wicket event */
       emitToMatch(m._id.toString(), SOCKET_EVENTS.WICKET, {
@@ -231,7 +296,7 @@ scoringRoutes.post(
     const preSwapStriker = inn.currentBatsman;
     const preSwapNonStriker = inn.currentNonStriker;
     const nextBat = wicketFell
-      ? inn.batting.find((b: any) => b.status === "batting" && b.playerId?.toString() !== p.batsmanId)
+      ? (p.nextBatsmanId || inn.batting.find((b: any) => b.status === "batting" && b.playerId?.toString() !== p.batsmanId)?.playerId?.toString())
       : undefined;
 
     /* ── Odd runs swap (within same over) ───────────────── */
@@ -251,7 +316,7 @@ scoringRoutes.post(
       isLegal,
       isWicket: wicketFell,
       wicket: p.wicket || null,
-      nextBatsmanId: nextBat?.playerId?.toString() || null,
+      nextBatsmanId: (typeof nextBat === 'string' ? nextBat : nextBat?.playerId?.toString()) || null,
       prevStriker: preSwapStriker,
       prevNonStriker: preSwapNonStriker,
     };
