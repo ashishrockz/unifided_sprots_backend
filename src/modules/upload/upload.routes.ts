@@ -39,6 +39,13 @@ uploadRoutes.post("/sport-media", authorize("super_admin", "sport_admin"), uploa
   ok(res, result, "Media uploaded");
 }));
 
+/** POST /upload/post-media — Upload post media: image or video (any authenticated user) */
+uploadRoutes.post("/post-media", uploadMedia, asyncHandler(async (req: AuthRequest, res) => {
+  if (!req.file) throw new AppError(ERRORS.UPLOAD.NO_FILE);
+  const result = await uploadToS3(req.file, "posts");
+  ok(res, result, "Media uploaded");
+}));
+
 /** DELETE /upload — Delete a file from S3 by key */
 uploadRoutes.delete("/", authorize("super_admin", "content_manager"), asyncHandler(async (req, res) => {
   const { key } = req.body;

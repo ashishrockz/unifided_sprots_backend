@@ -6,6 +6,11 @@ import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client
 import crypto from "crypto";
 import path from "path";
 import { env } from "../config/env";
+import { logger } from "./logger";
+
+if (!env.AWS_ACCESS_KEY_ID || !env.AWS_SECRET_ACCESS_KEY) {
+  logger.warn("AWS credentials not configured — S3 uploads will fail");
+}
 
 const s3 = new S3Client({
   region: env.AWS_REGION,
@@ -34,6 +39,7 @@ export async function uploadToS3(
       Key: key,
       Body: file.buffer,
       ContentType: file.mimetype,
+      ACL: "public-read",
     }),
   );
 

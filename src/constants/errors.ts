@@ -53,6 +53,8 @@ export const RESOURCE_ERRORS = Object.freeze({
   PLAN_NOT_FOUND:           def("RES_009", "Plan not found", 404),
   ORDER_NOT_FOUND:          def("RES_010", "Order not found", 404),
   MATCH_PACK_NOT_FOUND:     def("RES_011", "Match pack not found", 404),
+  NOT_FOUND:                def("RES_012", "Resource not found", 404),
+  POST_NOT_FOUND:           def("RES_013", "Post not found", 404),
 });
 
 /* ════════════ CONFLICT / DUPLICATE ════════════ */

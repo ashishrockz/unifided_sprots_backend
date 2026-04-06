@@ -40,6 +40,9 @@ import { adminAppConfigRoutes } from "../modules/admin/appConfig.routes";
 import { superAdminRoutes } from "../modules/admin/superadmin.routes";
 import { otpConfigRoutes } from "../modules/admin/otpConfig.routes";
 
+/* ── Posts ────────────────────────────────────────────── */
+import { postRoutes, adminPostRoutes } from "../modules/posts/post.routes";
+
 /* ── New modules ──────────────────────────────────────── */
 import { auditLogRoutes } from "../modules/audit-logs/auditLog.routes";
 import { adminPlansRoutes, superAdminPlansRoutes } from "../modules/plans/plans.routes";
@@ -92,6 +95,7 @@ export function createApp() {
   app.use(v + "/ads", maintenanceCheck);
   app.use(v + "/orders", maintenanceCheck);
   app.use(v + "/subscriptions", maintenanceCheck);
+  app.use(v + "/posts", maintenanceCheck);
 
   /* ── User-facing ──────────────────────────────────────── */
   app.use(v + "/friends", friendsRoutes);
@@ -111,12 +115,15 @@ export function createApp() {
   app.use(v, publicPlansRoutes);
   app.use(v + "/orders", userOrdersRoutes);
   app.use(v + "/subscriptions", userSubscriptionsRoutes);
+  app.use(v + "/posts", postRoutes);
 
   /* ── Admin core ───────────────────────────────────────── */
   app.use(v + "/admin/ads", adminAdsRoutes);
   app.use(v + "/admin", adminRoutes);
   app.use(v + "/admin", dashboardRoutes);
   app.use(v + "/admin/admins", adminManagementRoutes);
+
+  app.use(v + "/admin/posts", adminPostRoutes);
 
   /* ── Admin extended ───────────────────────────────────── */
   app.use(v + "/admin/rooms", adminRoomsRoutes);
