@@ -22,7 +22,7 @@ export interface IPost extends Document {
   media: { url: string; key: string; type: "image" | "video" }[];
   likes: Types.ObjectId[];
   likesCount: number;
-  comments: IComment[];
+  comments: Types.DocumentArray<IComment>;
   commentsCount: number;
   sharesCount: number;
   isActive: boolean;

@@ -139,13 +139,14 @@ postRoutes.delete(
     const post = await Post.findById(req.params.id);
     if (!post || !post.isActive) throw new AppError(ERRORS.RESOURCE.POST_NOT_FOUND);
 
-    const comment = post.comments.id(req.params.commentId);
+    const commentId = req.params.commentId as string;
+    const comment = post.comments.id(commentId);
     if (!comment) throw new AppError(ERRORS.RESOURCE.POST_NOT_FOUND);
     if (comment.user.toString() !== req.user!.userId) {
       throw new AppError(ERRORS.AUTH.FORBIDDEN);
     }
 
-    post.comments.pull(req.params.commentId);
+    post.comments.pull(commentId);
     post.commentsCount = post.comments.length;
     await post.save();
 
