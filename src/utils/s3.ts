@@ -4,11 +4,17 @@
  *          Images are auto-compressed to ~1MB before upload.
  */
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
-import sharp from "sharp";
 import crypto from "crypto";
 import path from "path";
 import { env } from "../config/env";
 import { logger } from "./logger";
+
+let sharp: any;
+try {
+  sharp = require("sharp");
+} catch {
+  logger.warn("sharp not installed — image compression disabled");
+}
 
 if (!env.AWS_ACCESS_KEY_ID || !env.AWS_SECRET_ACCESS_KEY) {
   logger.warn("AWS credentials not configured — S3 uploads will fail");
@@ -81,12 +87,16 @@ export async function uploadToS3(
   let { buffer, mimetype } = file;
   let ext = path.extname(file.originalname);
 
-  // Compress images
-  if (IMAGE_TYPES.includes(mimetype)) {
-    const compressed = await compressImage(buffer, mimetype);
-    buffer = compressed.buffer;
-    mimetype = compressed.mimetype;
-    if (compressed.mimetype === "image/jpeg") ext = ".jpg";
+  // Compress images (only if sharp is available)
+  if (sharp && IMAGE_TYPES.includes(mimetype)) {
+    try {
+      const compressed = await compressImage(buffer, mimetype);
+      buffer = compressed.buffer;
+      mimetype = compressed.mimetype;
+      if (compressed.mimetype === "image/jpeg") ext = ".jpg";
+    } catch (err: any) {
+      logger.warn(`Image compression failed, uploading original: ${err.message}`);
+    }
   }
 
   const key = `${folder}/${crypto.randomUUID()}${ext}`;
