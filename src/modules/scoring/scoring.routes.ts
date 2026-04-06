@@ -28,15 +28,15 @@ scoringRoutes.post(
   asyncHandler(async (req: any, res) => {
     const m = await Match.findById(req.params.matchId);
     if (!m) throw new AppError(ERRORS.RESOURCE.MATCH_NOT_FOUND);
-    if (m.status !== "live") throw new AppError({ message: "Match is not live", statusCode: 400, code: "MATCH_NOT_LIVE" });
+    if (m.status !== "live") throw new AppError({ message: "Match is not live", status: 400, code: "MATCH_NOT_LIVE" });
 
     const inn = m.innings[m.innings.length - 1];
-    if (!inn) throw new AppError({ message: "No active innings", statusCode: 400, code: "NO_INNINGS" });
-    if (inn.totalBalls > 0) throw new AppError({ message: "Cannot change openers after first ball", statusCode: 400, code: "INNINGS_STARTED" });
+    if (!inn) throw new AppError({ message: "No active innings", status: 400, code: "NO_INNINGS" });
+    if (inn.totalBalls > 0) throw new AppError({ message: "Cannot change openers after first ball", status: 400, code: "INNINGS_STARTED" });
 
     const { openerId1, openerId2, bowlerId } = req.body;
 
-    if (openerId1 === openerId2) throw new AppError({ message: "Opener 1 and 2 must be different players", statusCode: 400, code: "SAME_OPENER" });
+    if (openerId1 === openerId2) throw new AppError({ message: "Opener 1 and 2 must be different players", status: 400, code: "SAME_OPENER" });
 
     // Reset all batsmen to yet_to_bat
     for (const b of inn.batting) {
@@ -47,8 +47,8 @@ scoringRoutes.post(
     const opener1 = inn.batting.find((b: any) => b.playerId?.toString() === openerId1);
     const opener2 = inn.batting.find((b: any) => b.playerId?.toString() === openerId2);
 
-    if (!opener1) throw new AppError({ message: "Opener 1 not found in batting lineup", statusCode: 400, code: "PLAYER_NOT_FOUND" });
-    if (!opener2) throw new AppError({ message: "Opener 2 not found in batting lineup", statusCode: 400, code: "PLAYER_NOT_FOUND" });
+    if (!opener1) throw new AppError({ message: "Opener 1 not found in batting lineup", status: 400, code: "PLAYER_NOT_FOUND" });
+    if (!opener2) throw new AppError({ message: "Opener 2 not found in batting lineup", status: 400, code: "PLAYER_NOT_FOUND" });
 
     opener1.status = "batting";
     opener2.status = "batting";
