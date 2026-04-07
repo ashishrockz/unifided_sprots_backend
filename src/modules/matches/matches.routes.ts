@@ -138,24 +138,16 @@ matchRoutes.post(
     if (!m) throw new AppError(ERRORS.RESOURCE.MATCH_NOT_FOUND);
     if (!["draft", "team_setup"].includes(m.status))
       throw new AppError(ERRORS.BUSINESS.MATCH_NOT_READY);
-    const isTwoSider = req.body.isTwoSider === true;
     for (const pid of req.body.playerIds) {
+      // A player can only be in one team across the entire match
       const alreadyInTeam = m.teams.some((t: any) =>
         t.players.some((p: any) => p.user?.toString() === pid),
       );
-      // Allow two-sider: same player can be in both teams
-      if (alreadyInTeam && !isTwoSider)
-        throw new AppError(ERRORS.CONFLICT.PLAYER_IN_TEAM);
-      // Don't add duplicate in SAME team
-      const sameTeam = m.teams[req.body.teamIndex].players.some(
-        (p: any) => p.user?.toString() === pid,
-      );
-      if (sameTeam) throw new AppError(ERRORS.CONFLICT.PLAYER_IN_TEAM);
+      if (alreadyInTeam) throw new AppError(ERRORS.CONFLICT.PLAYER_IN_TEAM);
       m.teams[req.body.teamIndex].players.push({
         user: pid,
         role: "batsman",
         isGuest: false,
-        isTwoSider: isTwoSider || false,
       } as any);
     }
     m.status = "team_setup";
@@ -379,6 +371,9 @@ matchRoutes.post(
     if (!m) throw new AppError(ERRORS.RESOURCE.MATCH_NOT_FOUND);
     if (["completed", "abandoned"].includes(m.status))
       throw new AppError(ERRORS.BUSINESS.MATCH_ALREADY_ENDED);
+    // Only the creator can abandon their match
+    if (m.creator.toString() !== req.user!.userId)
+      throw new AppError(ERRORS.AUTH.FORBIDDEN);
     m.status = "abandoned";
     m.abandonedBy = "creator";
     m.abandonReason = req.body.reason || "Manually abandoned";

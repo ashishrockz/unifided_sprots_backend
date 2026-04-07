@@ -45,7 +45,6 @@ export const addPlayersSchema = z.object({
     .array(z.string().min(1))
     .min(1, "At least one player ID required")
     .max(15),
-  isTwoSider: z.boolean().optional(),
 });
 
 /** POST /matches/:matchId/players/guest — Add a guest player */

@@ -15,6 +15,27 @@ import { AppError } from "../../utils/AppError";
 import { ERRORS, MSG, SOCKET_EVENTS } from "../../constants";
 import { recordBallSchema, inningsSetupSchema } from "../matches/matches.validation";
 import { emitToMatch } from "../../socket";
+import { NotificationService } from "../notifications/notification.service";
+
+/** Returns true if the user is the creator OR a non-guest player in the match. */
+function isCreatorOrPlayer(match: any, userId: string): boolean {
+  if (match.creator?.toString() === userId) return true;
+  return match.teams.some((t: any) =>
+    t.players.some((p: any) => !p.isGuest && p.user?.toString() === userId),
+  );
+}
+
+/** Collect unique non-guest player user IDs (plus creator) for notifications. */
+function collectMatchUserIds(match: any): string[] {
+  const ids = new Set<string>();
+  if (match.creator) ids.add(match.creator.toString());
+  for (const t of match.teams) {
+    for (const p of t.players) {
+      if (!p.isGuest && p.user) ids.add(p.user.toString());
+    }
+  }
+  return Array.from(ids);
+}
 
 export const scoringRoutes = Router();
 
@@ -29,6 +50,7 @@ scoringRoutes.post(
     const m = await Match.findById(req.params.matchId);
     if (!m) throw new AppError(ERRORS.RESOURCE.MATCH_NOT_FOUND);
     if (m.status !== "live") throw new AppError({ message: "Match is not live", status: 400, code: "MATCH_NOT_LIVE" });
+    if (!isCreatorOrPlayer(m, req.user!.userId)) throw new AppError(ERRORS.AUTH.FORBIDDEN);
 
     const inn = m.innings[m.innings.length - 1];
     if (!inn) throw new AppError({ message: "No active innings", status: 400, code: "NO_INNINGS" });
@@ -78,6 +100,7 @@ scoringRoutes.post(
     const m = await Match.findById(req.params.matchId);
     if (!m) throw new AppError(ERRORS.RESOURCE.MATCH_NOT_FOUND);
     if (m.status !== "live") throw new AppError(ERRORS.BUSINESS.MATCH_NOT_LIVE);
+    if (!isCreatorOrPlayer(m, req.user!.userId)) throw new AppError(ERRORS.AUTH.FORBIDDEN);
 
     const inn = m.innings.find((i: any) => i.status === "in_progress");
     if (!inn) throw new AppError(ERRORS.RESOURCE.INNINGS_NOT_FOUND);
@@ -361,6 +384,17 @@ scoringRoutes.post(
         matchId: m._id, winner: m.winner, result: m.result,
       });
 
+      /* ── Notify all participating players ────────────── */
+      const userIds = collectMatchUserIds(m);
+      if (userIds.length > 0) {
+        NotificationService.sendToMany(userIds, {
+          type: "match_completed",
+          title: "Match completed",
+          body: `${m.title} — ${m.result?.description ?? "Match has ended"}`,
+          data: { matchId: m._id.toString() },
+        }).catch(() => {/* fire-and-forget */});
+      }
+
       /* ── Update player stats asynchronously ──────────── */
       updatePlayerStats(m).catch(() => {/* fire-and-forget */});
     }
@@ -495,6 +529,7 @@ scoringRoutes.post(
     const m = await Match.findById(req.params.matchId);
     if (!m) throw new AppError(ERRORS.RESOURCE.MATCH_NOT_FOUND);
     if (m.status !== "live") throw new AppError(ERRORS.BUSINESS.MATCH_NOT_LIVE);
+    if (!isCreatorOrPlayer(m, req.user!.userId)) throw new AppError(ERRORS.AUTH.FORBIDDEN);
 
     const inn = m.innings.find((i: any) => i.status === "in_progress");
     if (!inn) throw new AppError(ERRORS.RESOURCE.INNINGS_NOT_FOUND);

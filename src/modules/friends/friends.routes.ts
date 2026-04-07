@@ -8,6 +8,7 @@ import{ok,created,paginated,noContent,buildPage,parseQuery}from"../../utils/resp
 import{AppError}from"../../utils/AppError";
 import{ERRORS,MSG}from"../../constants";
 import{sendRequestSchema}from"./friends.validation";
+import{NotificationService}from"../notifications/notification.service";
 
 export const friendsRoutes=Router();
 friendsRoutes.use(authenticate);
@@ -19,6 +20,16 @@ friendsRoutes.post("/request",validate(sendRequestSchema),asyncHandler(async(req
   if(ex?.status==="accepted")throw new AppError(ERRORS.CONFLICT.ALREADY_FRIENDS);
   if(ex?.status==="pending")throw new AppError(ERRORS.CONFLICT.REQUEST_PENDING);
   const r=ex?(ex.status="pending",ex.sender=sid as any,ex.receiver=receiverId as any,await ex.save()):await FriendRequest.create({sender:sid,receiver:receiverId});
+  // Notify the receiver
+  const sender=await User.findById(sid).select("displayName username").lean();
+  const senderName=sender?.displayName||sender?.username||"Someone";
+  NotificationService.create({
+    user:receiverId,
+    type:"friend_request_received",
+    title:"New friend request",
+    body:`${senderName} sent you a friend request`,
+    data:{requestId:r._id.toString(),fromUserId:sid},
+  }).catch(()=>{/* fire-and-forget */});
   created(res,r,MSG.FRIEND_SENT);
 }));
 friendsRoutes.put("/request/:id/accept",asyncHandler(async(req:any,res)=>{
@@ -27,6 +38,16 @@ friendsRoutes.put("/request/:id/accept",asyncHandler(async(req:any,res)=>{
   r.status="accepted";r.respondedAt=new Date();await r.save();
   await User.findByIdAndUpdate(r.sender,{$addToSet:{friends:r.receiver}});
   await User.findByIdAndUpdate(r.receiver,{$addToSet:{friends:r.sender}});
+  // Notify the original sender that their request was accepted
+  const accepter=await User.findById(req.user!.userId).select("displayName username").lean();
+  const accepterName=accepter?.displayName||accepter?.username||"Someone";
+  NotificationService.create({
+    user:r.sender.toString(),
+    type:"friend_request_accepted",
+    title:"Friend request accepted",
+    body:`${accepterName} accepted your friend request`,
+    data:{requestId:r._id.toString(),fromUserId:req.user!.userId},
+  }).catch(()=>{/* fire-and-forget */});
   ok(res,r,MSG.FRIEND_ACCEPTED);
 }));
 friendsRoutes.put("/request/:id/reject",asyncHandler(async(req:any,res)=>{
