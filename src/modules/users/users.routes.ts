@@ -38,10 +38,54 @@ profileRoutes.get(
 
     if (!user) throw new AppError(ERRORS.RESOURCE.USER_NOT_FOUND);
 
+    // Live counts from the Match collection. The denormalized counters
+    // on the user document are unreliable (they only updated on cricket
+    // scoring completion and overwrote across sports), so we recompute
+    // here. Cheap thanks to the existing {teams.players.user, status}
+    // index on Match.
+    const userId = req.user!.userId;
+    const userObjectId = new Match.base.Types.ObjectId(userId);
+
+    const [totalMatches, winsAgg] = await Promise.all([
+      Match.countDocuments({
+        "teams.players.user": userId,
+        status: { $in: ["completed", "abandoned"] },
+      }),
+      Match.aggregate([
+        {
+          $match: {
+            "teams.players.user": userObjectId,
+            status: "completed",
+            winner: { $in: [0, 1] },
+          },
+        },
+        {
+          $addFields: {
+            winningTeamPlayers: {
+              $getField: {
+                field: "players",
+                input: { $arrayElemAt: ["$teams", "$winner"] },
+              },
+            },
+          },
+        },
+        {
+          $match: {
+            "winningTeamPlayers.user": userObjectId,
+          },
+        },
+        { $count: "wins" },
+      ]),
+    ]);
+
+    const winsCount = (winsAgg as any[])[0]?.wins ?? 0;
+
     /* Attach friends count without loading the full array */
     const enriched = {
       ...user,
       friendsCount: user.friends?.length ?? 0,
+      totalMatchesAllSports: totalMatches,
+      totalWinsAllSports: winsCount,
     };
 
     ok(res, enriched, MSG.PROFILE_FETCHED);

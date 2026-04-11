@@ -72,7 +72,20 @@ sportMatchRoutes.get(
   asyncHandler(async (req: any, res) => {
     const { page, limit, skip } = parseQuery(req.query);
     const q: any = { sportSlug: req.params.slug };
+
+    // Single status filter, e.g. ?status=live
     if (req.query.status) q.status = req.query.status;
+
+    // Exclusion filter, e.g. ?excludeStatus=completed,abandoned — use this on
+    // the home screen so already-played matches don't pollute the active list.
+    if (req.query.excludeStatus) {
+      const exclude = String(req.query.excludeStatus)
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (exclude.length > 0) q.status = { ...(q.status ? { $eq: q.status } : {}), $nin: exclude };
+    }
+
     if (req.query.mine === "true" && req.user?.userId) {
       q.$or = [
         { creator: req.user.userId },

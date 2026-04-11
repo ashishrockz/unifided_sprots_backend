@@ -41,10 +41,18 @@ postRoutes.get(
       Post.countDocuments(q),
     ]);
 
+    // Drop posts whose author was deleted (populate sets it to null) so
+    // the mobile feed never has to defend against `author: null`. Admin
+    // posts have authorType="admin" and may legitimately have a null
+    // author reference, so keep those.
+    const visible = data.filter((post: any) => post.authorType === "admin" || post.author);
+
     // Attach `isLiked` flag for the requesting user
     const userId = req.user?.userId;
-    const enriched = data.map((post: any) => ({
+    const enriched = visible.map((post: any) => ({
       ...post,
+      // Strip orphaned comment authors so the client doesn't blow up either.
+      comments: (post.comments ?? []).filter((c: any) => c.user),
       isLiked: post.likes?.some((id: any) => id.toString() === userId) ?? false,
       likes: undefined, // Don't send full likes array to client
     }));
