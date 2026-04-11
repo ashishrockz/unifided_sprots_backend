@@ -16,6 +16,7 @@ import { ERRORS, MSG, SOCKET_EVENTS } from "../../constants";
 import { recordBallSchema, inningsSetupSchema } from "../matches/matches.validation";
 import { emitToMatch } from "../../socket";
 import { NotificationService } from "../notifications/notification.service";
+import { withMatchLock, withIdempotency } from "../../utils/matchLock";
 
 /** Returns true if the user is the creator OR a non-guest player in the match. */
 function isCreatorOrPlayer(match: any, userId: string): boolean {
@@ -47,6 +48,7 @@ scoringRoutes.post(
   authenticate,
   validate(inningsSetupSchema),
   asyncHandler(async (req: any, res) => {
+    await withMatchLock(req.params.matchId, async () => {
     const m = await Match.findById(req.params.matchId);
     if (!m) throw new AppError(ERRORS.RESOURCE.MATCH_NOT_FOUND);
     if (m.status !== "live") throw new AppError({ message: "Match is not live", status: 400, code: "MATCH_NOT_LIVE" });
@@ -86,6 +88,7 @@ scoringRoutes.post(
     await m.save();
 
     ok(res, m, "Innings setup complete");
+    });
   }),
 );
 
@@ -97,6 +100,15 @@ scoringRoutes.post(
   authenticate,
   validate(recordBallSchema),
   asyncHandler(async (req: any, res) => {
+    const idempotencyKey =
+      (req.headers["idempotency-key"] as string | undefined) ??
+      (req.body?.idempotencyKey as string | undefined);
+
+    const payload = await withIdempotency(
+      `score:${req.params.matchId}`,
+      idempotencyKey,
+      () =>
+        withMatchLock(req.params.matchId, async () => {
     const m = await Match.findById(req.params.matchId);
     if (!m) throw new AppError(ERRORS.RESOURCE.MATCH_NOT_FOUND);
     if (m.status !== "live") throw new AppError(ERRORS.BUSINESS.MATCH_NOT_LIVE);
@@ -392,14 +404,24 @@ scoringRoutes.post(
           title: "Match completed",
           body: `${m.title} — ${m.result?.description ?? "Match has ended"}`,
           data: { matchId: m._id.toString() },
-        }).catch(() => {/* fire-and-forget */});
+        }).catch((err) => {
+          // eslint-disable-next-line no-console
+          console.error("[scoring] notification send failed:", err);
+        });
       }
 
       /* ── Update player stats asynchronously ──────────── */
-      updatePlayerStats(m).catch(() => {/* fire-and-forget */});
+      updatePlayerStats(m).catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error("[scoring] updatePlayerStats failed:", err);
+      });
     }
 
-    ok(res, m, MSG.BALL_RECORDED);
+          return m.toObject();
+        }),
+    );
+
+    ok(res, payload, MSG.BALL_RECORDED);
   }),
 );
 
@@ -526,6 +548,7 @@ scoringRoutes.post(
   "/:matchId/score/undo",
   authenticate,
   asyncHandler(async (req: any, res) => {
+    await withMatchLock(req.params.matchId, async () => {
     const m = await Match.findById(req.params.matchId);
     if (!m) throw new AppError(ERRORS.RESOURCE.MATCH_NOT_FOUND);
     if (m.status !== "live") throw new AppError(ERRORS.BUSINESS.MATCH_NOT_LIVE);
@@ -643,6 +666,7 @@ scoringRoutes.post(
     });
 
     ok(res, m, MSG.BALL_UNDONE);
+    });
   }),
 );
 

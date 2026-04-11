@@ -43,7 +43,9 @@ const ms = new Schema<IMatch>({
   lastActivityAt: { type: Date, default: Date.now }, inactivityLimit: { type: Number, default: 30 },
   lastBallSnapshot: { type: Schema.Types.Mixed, default: null },
   startedAt: Date, completedAt: Date,
-}, { timestamps: true });
+}, { timestamps: true, optimisticConcurrency: true });
 ms.index({ sportSlug: 1, status: 1 }); ms.index({ creator: 1 }); ms.index({ "teams.players.user": 1, status: 1 });
 ms.index({ location: "2dsphere" });
+// Compound index for auto-abandon worker: find live matches sorted by staleness.
+ms.index({ status: 1, lastActivityAt: 1 });
 export const Match = model<IMatch>("Match", ms);
