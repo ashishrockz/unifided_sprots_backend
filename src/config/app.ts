@@ -8,6 +8,7 @@ import { env } from "./env";
 import { apiLimiter } from "../middleware/rateLimiter";
 import { errorHandler } from "../middleware/errorHandler";
 import { maintenanceCheck } from "../middleware/maintenance";
+import { auditLogger } from "../middleware/auditLogger";
 import { swaggerSpec } from "../swagger/config";
 
 /* ── Auth ─────────────────────────────────────────────── */
@@ -118,6 +119,11 @@ export function createApp() {
   app.use(v + "/posts", postRoutes);
 
   /* ── Admin core ───────────────────────────────────────── */
+  // Audit every admin write operation (POST/PUT/PATCH/DELETE).
+  app.use(v + "/admin", auditLogger);
+  app.use(v + "/superadmin", auditLogger);
+  app.use(v + "/app-config", auditLogger);
+
   app.use(v + "/admin/ads", adminAdsRoutes);
   app.use(v + "/admin", adminRoutes);
   app.use(v + "/admin", dashboardRoutes);
