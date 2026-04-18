@@ -54,6 +54,9 @@ authRoutes.post(
   "/logout",
   authenticate,
   asyncHandler(async (req: any, res) => {
+    // Blacklist the access token so it can't be reused
+    const token = req.headers.authorization?.split(" ")[1];
+    if (token) await AuthService.blacklistToken(token);
     await AuthService.logout(req.user!.userId);
     ok(res, null, MSG.LOGGED_OUT);
   }),
@@ -96,6 +99,8 @@ adminAuthRoutes.post(
   "/logout",
   authenticate,
   asyncHandler(async (req: any, res) => {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (token) await AuthService.blacklistToken(token);
     await AuthService.logout(req.user!.userId);
     ok(res, null, MSG.LOGGED_OUT);
   }),

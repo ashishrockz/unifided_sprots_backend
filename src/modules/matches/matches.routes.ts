@@ -139,6 +139,49 @@ sportMatchRoutes.get(
   }),
 );
 
+/**
+ * GET /sports/:slug/matches/:matchId/share
+ * @desc    Get a shareable text summary + deep link for a match.
+ *          No auth required — public for viral sharing.
+ */
+sportMatchRoutes.get(
+  "/:slug/matches/:matchId/share",
+  asyncHandler(async (req, res) => {
+    const m = await Match.findById(req.params.matchId)
+      .select("title status teams innings toss result matchConfig")
+      .lean();
+    if (!m) throw new AppError(ERRORS.RESOURCE.MATCH_NOT_FOUND);
+
+    const team1 = m.teams[0]?.name || "Team 1";
+    const team2 = m.teams[1]?.name || "Team 2";
+    const lines: string[] = [`${m.title}`];
+
+    // Add innings scores
+    for (const inn of m.innings || []) {
+      const teamName = m.teams[inn.battingTeamIndex]?.name || "Team";
+      lines.push(`${teamName}: ${inn.totalRuns}/${inn.totalWickets} (${inn.totalOvers} ov)`);
+    }
+
+    // Add result
+    if (m.result?.description) {
+      lines.push(`\n${m.result.description}`);
+    } else if (m.status === "live") {
+      lines.push("\nMatch in progress");
+    }
+
+    // Add toss
+    if (m.toss?.decision) {
+      const tossWinner = m.teams[m.toss.wonBy]?.name || "Unknown";
+      lines.push(`Toss: ${tossWinner} chose to ${m.toss.decision}`);
+    }
+
+    const deepLink = `https://criccircle.app/match/${m._id}`;
+    const text = lines.join("\n") + `\n\nFollow live on CricCircle\n${deepLink}`;
+
+    ok(res, { text, deepLink, title: m.title, team1, team2 }, MSG.FETCHED("Share data"));
+  }),
+);
+
 export const matchRoutes = Router();
 matchRoutes.use(authenticate);
 matchRoutes.post(

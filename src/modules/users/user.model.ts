@@ -6,6 +6,12 @@
 import { Schema, model, Document, Types } from "mongoose";
 import { USER_ROLES, ADMIN_ROLES, SUB_PLANS, VISIBILITY } from "../../constants";
 
+export interface IFcmToken {
+  token: string;
+  platform: string;
+  updatedAt: Date;
+}
+
 export interface IUser extends Document {
   _id: Types.ObjectId; username: string; email?: string; mobile?: string; password?: string;
   avatar?: string; displayName?: string; bio?: string; country?: string;
@@ -15,6 +21,7 @@ export interface IUser extends Document {
   totalMatchesAllSports: number; totalWinsAllSports: number; totalMVPCount: number; totalPOMCount: number;
   friends: Types.ObjectId[]; lastLoginAt?: Date;
   deviceInfo?: { platform: string; deviceId: string; appVersion: string };
+  fcmTokens: IFcmToken[];
   createdAt: Date; updatedAt: Date;
 }
 
@@ -35,6 +42,7 @@ const schema = new Schema<IUser>({
   friends:     [{ type: Schema.Types.ObjectId, ref: "User" }],
   lastLoginAt: Date,
   deviceInfo:  { platform: String, deviceId: String, appVersion: String },
+  fcmTokens:  [{ token: { type: String, required: true }, platform: { type: String, default: "android" }, updatedAt: { type: Date, default: Date.now } }],
 }, { timestamps: true, toJSON: { transform: (_d, r: Record<string, any>) => { delete r.password; delete r.__v; return r; } } });
 
 // Indexes already created via `unique: true` on schema fields

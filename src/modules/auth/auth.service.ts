@@ -135,10 +135,33 @@ export class AuthService {
     await getRedis().del(`refresh:${userId}`);
   }
 
+  /** Blacklist the current access token on logout */
+  static async blacklistToken(token: string) {
+    try {
+      const decoded = jwt.decode(token) as any;
+      if (decoded?.jti) {
+        const ttl = decoded.exp ? decoded.exp - Math.floor(Date.now() / 1000) : 900;
+        if (ttl > 0) {
+          await getRedis().set(`bl:${decoded.jti}`, "1", "EX", ttl);
+        }
+      }
+    } catch {
+      // Token already expired or invalid — no need to blacklist
+    }
+  }
+
+  /** Check if a token's jti is blacklisted */
+  static async isBlacklisted(jti: string): Promise<boolean> {
+    if (!jti) return false;
+    const val = await getRedis().get(`bl:${jti}`);
+    return val === "1";
+  }
+
   /** Generate JWT access + refresh pair */
   private static _tokens(p: { userId: string; role: string }): TokenPair {
+    const jti = crypto.randomBytes(16).toString("hex");
     return {
-      accessToken: jwt.sign(p, env.JWT_ACCESS_SECRET, {
+      accessToken: jwt.sign({ ...p, jti }, env.JWT_ACCESS_SECRET, {
         expiresIn: env.JWT_ACCESS_EXPIRY,
       } as any),
       refreshToken: jwt.sign(p, env.JWT_REFRESH_SECRET, {

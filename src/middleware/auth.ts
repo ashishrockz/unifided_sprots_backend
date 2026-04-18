@@ -10,13 +10,31 @@ import jwt from "jsonwebtoken";
 import { env } from "../config/env";
 import { AppError } from "../utils/AppError";
 import { ERRORS } from "../constants";
+import { AuthService } from "../modules/auth/auth.service";
 import type { AuthRequest, JwtPayload } from "../types";
 
 export function authenticate(req: AuthRequest, _res: Response, next: NextFunction): void {
   try {
     const hdr = req.headers.authorization;
     if (!hdr?.startsWith("Bearer ")) throw new AppError(ERRORS.AUTH.MISSING_TOKEN);
-    req.user = jwt.verify(hdr.split(" ")[1], env.JWT_ACCESS_SECRET) as JwtPayload;
+    const payload = jwt.verify(hdr.split(" ")[1], env.JWT_ACCESS_SECRET) as JwtPayload;
+
+    // Check if token is blacklisted (revoked on logout)
+    if ((payload as any).jti) {
+      AuthService.isBlacklisted((payload as any).jti).then((revoked) => {
+        if (revoked) return next(new AppError(ERRORS.AUTH.INVALID_TOKEN));
+        req.user = payload;
+        next();
+      }).catch(() => {
+        // Redis down — allow through (fail open to avoid blocking all requests)
+        req.user = payload;
+        next();
+      });
+      return;
+    }
+
+    // Legacy tokens without jti — allow through
+    req.user = payload;
     next();
   } catch (e) {
     if (e instanceof jwt.TokenExpiredError) return next(new AppError(ERRORS.AUTH.EXPIRED_TOKEN));

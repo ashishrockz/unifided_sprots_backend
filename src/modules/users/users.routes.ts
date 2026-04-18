@@ -297,3 +297,45 @@ profileRoutes.get(
     paginated(res, data, buildPage(page, limit, total), MSG.LIST("Match history"));
   })
 );
+
+/**
+ * POST /profile/device-token
+ * @desc    Register or update an FCM device token for push notifications.
+ *          Upserts: if the token already exists, updates the timestamp;
+ *          otherwise pushes a new entry. Max 5 tokens per user.
+ * @access  Private (User)
+ */
+profileRoutes.post(
+  "/device-token",
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res) => {
+    const { token, platform } = req.body;
+    if (!token || typeof token !== "string") {
+      throw new AppError(ERRORS.VALIDATION.INVALID_INPUT);
+    }
+
+    const userId = req.user!.userId;
+
+    // Remove this token from any other user (device changed accounts)
+    await User.updateMany(
+      { _id: { $ne: userId }, "fcmTokens.token": token },
+      { $pull: { fcmTokens: { token } } },
+    );
+
+    // Upsert on current user
+    const updated = await User.findOneAndUpdate(
+      { _id: userId, "fcmTokens.token": token },
+      { $set: { "fcmTokens.$.platform": platform || "android", "fcmTokens.$.updatedAt": new Date() } },
+      { new: true },
+    );
+
+    if (!updated) {
+      // Token doesn't exist yet — push it (cap at 5 devices)
+      await User.findByIdAndUpdate(userId, {
+        $push: { fcmTokens: { $each: [{ token, platform: platform || "android", updatedAt: new Date() }], $slice: -5 } },
+      });
+    }
+
+    ok(res, null, "Device token registered");
+  })
+);

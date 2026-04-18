@@ -18,7 +18,6 @@ const schema = new Schema<ISubscription>({
   extraMatches: { type: Number, default: 0 },
 }, { timestamps: true });
 
-schema.index({ user: 1 });
-schema.index({ status: 1 });
+schema.index({ user: 1, status: 1 });
 
 export const Subscription = model<ISubscription>("Subscription", schema);

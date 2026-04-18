@@ -24,8 +24,7 @@ const schema = new Schema<IOrder>({
   status: { type: String, enum: ["created", "paid", "failed", "refunded"], default: "created" },
 }, { timestamps: true });
 
-schema.index({ user: 1 });
-schema.index({ status: 1 });
-schema.index({ createdAt: -1 });
+schema.index({ user: 1, createdAt: -1 });
+schema.index({ status: 1, createdAt: -1 });
 
 export const Order = model<IOrder>("Order", schema);
