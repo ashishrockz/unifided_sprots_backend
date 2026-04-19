@@ -41,6 +41,9 @@ import { adminAppConfigRoutes } from "../modules/admin/appConfig.routes";
 import { superAdminRoutes } from "../modules/admin/superadmin.routes";
 import { otpConfigRoutes } from "../modules/admin/otpConfig.routes";
 
+/* ── Legal ────────────────────────────────────────────── */
+import { legalRoutes } from "../modules/legal/legal.routes";
+
 /* ── Posts ────────────────────────────────────────────── */
 import { postRoutes, adminPostRoutes } from "../modules/posts/post.routes";
 
@@ -117,6 +120,7 @@ export function createApp() {
   app.use(v + "/orders", userOrdersRoutes);
   app.use(v + "/subscriptions", userSubscriptionsRoutes);
   app.use(v + "/posts", postRoutes);
+  app.use(v + "/legal", legalRoutes);
 
   /* ── Admin core ───────────────────────────────────────── */
   // Audit every admin write operation (POST/PUT/PATCH/DELETE).
