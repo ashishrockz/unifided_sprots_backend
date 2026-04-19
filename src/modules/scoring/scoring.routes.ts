@@ -38,6 +38,40 @@ function collectMatchUserIds(match: any): string[] {
   return Array.from(ids);
 }
 
+/** Auto-generate ball-by-ball commentary text. */
+function generateCommentary(batRuns: number, payload: any, isWicket: boolean): string {
+  if (isWicket) {
+    const wt = payload.wicket?.type || "out";
+    const labels: Record<string, string> = {
+      bowled: "Timber! The stumps are shattered!",
+      caught: "Taken! A good catch in the field!",
+      caught_behind: "Caught behind by the keeper!",
+      caught_and_bowled: "Caught and bowled! Return catch!",
+      lbw: "Trapped in front! Given LBW!",
+      run_out: "Run out! Direct hit!",
+      stumped: "Stumped! Quick work by the keeper!",
+      hit_wicket: "Hit wicket! Unfortunate dismissal!",
+    };
+    return labels[wt] || "OUT!";
+  }
+  if (payload.extras) {
+    const et = payload.extras.type;
+    const er = payload.extras.runs ?? 1;
+    if (et === "wide") return `Wide ball, ${er} run${er > 1 ? "s" : ""} added`;
+    if (et === "no_ball") return `No ball! ${er} extra run${er > 1 ? "s" : ""}`;
+    if (et === "bye") return `Bye, ${er} run${er > 1 ? "s" : ""} to the total`;
+    if (et === "leg_bye") return `Leg bye, ${er} run${er > 1 ? "s" : ""} to the total`;
+  }
+  if (batRuns === 0) return "Dot ball, well bowled!";
+  if (batRuns === 1) return "Single taken, rotates the strike";
+  if (batRuns === 2) return "Good running, two runs";
+  if (batRuns === 3) return "Three runs, great running!";
+  if (batRuns === 4) return "FOUR! Racing away to the boundary!";
+  if (batRuns === 5) return "Five runs! All run!";
+  if (batRuns === 6) return "SIX! Massive hit over the boundary!";
+  return `${batRuns} runs`;
+}
+
 export const scoringRoutes = Router();
 
 /* ═══════════════════════════════════════════════════════════
@@ -116,6 +150,10 @@ scoringRoutes.post(
 
     const inn = m.innings.find((i: any) => i.status === "in_progress");
     if (!inn) throw new AppError(ERRORS.RESOURCE.INNINGS_NOT_FOUND);
+
+    // Capture current batsmen IDs for partnership tracking (before any mutations)
+    const preStrikerId = inn.currentBatsman?.toString();
+    const preNonStrikerId = inn.currentNonStriker?.toString();
 
     const p = req.body;
     const isExtra = !!p.extras;
@@ -243,6 +281,87 @@ scoringRoutes.post(
       const t = inn.currentBatsman;
       inn.currentBatsman = inn.currentNonStriker;
       inn.currentNonStriker = t;
+    }
+
+    /* ── Over/ball tracking & auto-commentary ─────────── */
+    {
+      const overIdx = isLegal
+        ? Math.floor((inn.totalBalls - 1) / 6)
+        : Math.floor(inn.totalBalls / 6);
+      const overNum = overIdx + 1;
+
+      let currentOver = inn.overs?.find((o: any) => o.overNumber === overNum);
+      if (!currentOver) {
+        const bowlerTeam = m.teams[inn.bowlingTeamIndex];
+        const bowlerPlayer = bowlerTeam?.players?.find(
+          (pl: any) => pl.user?.toString() === p.bowlerId,
+        );
+        const bName = bowlerPlayer?.isGuest ? (bowlerPlayer.guestName || "") : "";
+        inn.overs.push({
+          overNumber: overNum, bowlerId: p.bowlerId, bowlerName: bName,
+          runs: 0, wickets: 0, extras: 0, isMaiden: false, balls: [],
+          runRateAfterOver: 0, cumulativeRuns: 0, cumulativeWickets: 0,
+        });
+        currentOver = inn.overs[inn.overs.length - 1];
+      }
+
+      const commentary = generateCommentary(batR, p, wicketFell);
+      currentOver.balls.push({
+        ballNumber: isLegal ? ((inn.totalBalls - 1) % 6) + 1 : null,
+        deliveryNumber: currentOver.balls.length + 1,
+        batsmanId: p.batsmanId, bowlerId: p.bowlerId,
+        runs: batR,
+        extras: p.extras ? { type: p.extras.type, runs: extR } : undefined,
+        totalRuns: totR, isLegal, isWicket: wicketFell,
+        isBoundary: batR === 4 || batR === 6,
+        isDotBall: totR === 0 && isLegal,
+        wicket: wicketFell ? p.wicket : undefined,
+        commentary, timestamp: new Date(),
+      });
+      currentOver.runs += totR;
+      if (wicketFell) currentOver.wickets += 1;
+      if (p.extras) currentOver.extras += extR;
+
+      if (overCompleted) {
+        currentOver.isMaiden = currentOver.runs === 0;
+        currentOver.runRateAfterOver = inn.currentRunRate;
+        currentOver.cumulativeRuns = inn.totalRuns;
+        currentOver.cumulativeWickets = inn.totalWickets;
+        if (currentOver.isMaiden && bw) bw.maidens += 1;
+      }
+    }
+
+    /* ── Partnership tracking ──────────────────────────── */
+    {
+      let activePship = inn.partnerships?.find((ps: any) => ps.isActive);
+
+      if (!activePship && preStrikerId && preNonStrikerId) {
+        inn.partnerships.push({
+          partnershipNumber: (inn.partnerships?.length || 0) + 1,
+          batsman1: { playerId: preStrikerId, runs: 0, balls: 0 },
+          batsman2: { playerId: preNonStrikerId, runs: 0, balls: 0 },
+          totalRuns: 0, totalBalls: 0, isActive: true,
+        });
+        activePship = inn.partnerships[inn.partnerships.length - 1];
+      }
+
+      if (activePship) {
+        activePship.totalRuns += totR;
+        if (isLegal) activePship.totalBalls += 1;
+
+        const b1Id = activePship.batsman1?.playerId?.toString();
+        if (b1Id === p.batsmanId) {
+          activePship.batsman1.runs += batR;
+          if (isLegal) activePship.batsman1.balls += 1;
+        } else {
+          activePship.batsman2.runs += batR;
+          if (isLegal) activePship.batsman2.balls += 1;
+        }
+
+        if (wicketFell) {
+          activePship.isActive = false;
+        }
+      }
     }
 
     /* ── Innings end check ──────────────────────────────── */
@@ -651,6 +770,50 @@ scoringRoutes.post(
     /* ── Restore strike ────────────────────────────────────── */
     inn.currentBatsman = snap.prevStriker;
     inn.currentNonStriker = snap.prevNonStriker;
+
+    /* ── Reverse over/ball tracking ───────────────────────── */
+    if (inn.overs && inn.overs.length > 0) {
+      const lastOver = inn.overs[inn.overs.length - 1];
+      if (lastOver.balls && lastOver.balls.length > 0) {
+        const removed = lastOver.balls.pop();
+        lastOver.runs -= (removed?.totalRuns ?? 0);
+        if (removed?.isWicket) lastOver.wickets -= 1;
+        if (removed?.extras) lastOver.extras -= (removed.extras.runs ?? 0);
+        // Undo maiden bonus if an over was previously completed as maiden
+        if (lastOver.isMaiden && lastOver.balls.length >= 6) {
+          // Re-evaluate — but simpler to just reset; maidens recalc on next over end
+          lastOver.isMaiden = false;
+        }
+      }
+      if (lastOver.balls.length === 0) inn.overs.pop();
+    }
+
+    /* ── Reverse partnership tracking ──────────────────────── */
+    if (inn.partnerships && inn.partnerships.length > 0) {
+      if (snap.isWicket) {
+        // Wicket was undone: remove the new (empty) partnership, reactivate previous
+        const lastP = inn.partnerships[inn.partnerships.length - 1];
+        if (lastP && lastP.totalBalls === 0 && lastP.totalRuns === 0) {
+          inn.partnerships.pop();
+        }
+        if (inn.partnerships.length > 0) {
+          inn.partnerships[inn.partnerships.length - 1].isActive = true;
+        }
+      }
+      const activeP = inn.partnerships.find((ps: any) => ps.isActive);
+      if (activeP) {
+        activeP.totalRuns -= snap.totalRuns;
+        if (snap.isLegal) activeP.totalBalls -= 1;
+        const b1Id = activeP.batsman1?.playerId?.toString();
+        if (b1Id === snap.batsmanId) {
+          activeP.batsman1.runs -= snap.batRuns;
+          if (snap.isLegal) activeP.batsman1.balls -= 1;
+        } else {
+          activeP.batsman2.runs -= snap.batRuns;
+          if (snap.isLegal) activeP.batsman2.balls -= 1;
+        }
+      }
+    }
 
     /* ── Clear snapshot ────────────────────────────────────── */
     (m as any).lastBallSnapshot = undefined;
