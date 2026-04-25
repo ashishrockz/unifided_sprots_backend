@@ -17,7 +17,7 @@ import { authRoutes, adminAuthRoutes } from "../modules/auth/auth.routes";
 /* ── User-facing ──────────────────────────────────────── */
 import { friendsRoutes } from "../modules/friends/friends.routes";
 import { sportsRoutes, adminSportsRoutes } from "../modules/sports/sports.routes";
-import { sportMatchRoutes, matchRoutes } from "../modules/matches/matches.routes";
+import { sportMatchRoutes, matchRoutes, meRoutes } from "../modules/matches/matches.routes";
 import { scoringRoutes } from "../modules/scoring/scoring.routes";
 import { tossRoutes } from "../modules/toss/toss.routes";
 import { notificationRoutes } from "../modules/notifications/notifications.routes";
@@ -94,6 +94,7 @@ export function createApp() {
   app.use(v + "/friends", maintenanceCheck);
   app.use(v + "/sports", maintenanceCheck);
   app.use(v + "/matches", maintenanceCheck);
+  app.use(v + "/me", maintenanceCheck);
   app.use(v + "/notifications", maintenanceCheck);
   app.use(v + "/profile", maintenanceCheck);
   app.use(v + "/ads", maintenanceCheck);
@@ -110,6 +111,7 @@ export function createApp() {
   app.use(v + "/sports", sportMatchRoutes);
   app.use(v + "/sports", leaderboardRoutes);
   app.use(v + "/matches", matchRoutes);
+  app.use(v + "/me", meRoutes);
   app.use(v + "/matches", scoringRoutes);
   app.use(v + "/matches", tossRoutes);
   app.use(v + "/notifications", notificationRoutes);

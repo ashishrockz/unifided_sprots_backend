@@ -32,7 +32,7 @@ export class NotificationService {
     this._emitUnreadCount(userId);
 
     // Fire-and-forget FCM push
-    this._sendFcm([userId], payload.title, payload.body, payload.data);
+    this._sendFcm([userId], payload.title, payload.body, { ...payload.data, type: payload.type });
 
     return notif;
   }
@@ -55,7 +55,7 @@ export class NotificationService {
     }
 
     // Fire-and-forget FCM push to all recipients
-    this._sendFcm(userIds, data.title, data.body, data.data);
+    this._sendFcm(userIds, data.title, data.body, { ...data.data, type: data.type });
 
     return notifs;
   }

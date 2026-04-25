@@ -38,7 +38,7 @@ sportMatchRoutes.post(
     if (
       await Match.findOne({
         "teams.players.user": uid,
-        status: { $in: ["live", "toss"] },
+        status: { $in: ["draft", "team_setup", "toss", "live"] },
       })
     )
       throw new AppError(ERRORS.CONFLICT.PLAYER_IN_MATCH);
@@ -437,5 +437,27 @@ matchRoutes.post(
     await m.save();
     emitToMatch(m._id.toString(), SOCKET_EVENTS.MATCH_ABANDONED, { matchId: m._id, reason: m.abandonReason });
     ok(res, m, MSG.MATCH_ABANDONED);
+  }),
+);
+
+/**
+ * GET /me/active-match
+ * @desc    Returns the user's current non-terminal match (draft, team_setup,
+ *          toss, live) across all sports — used by the mobile to short-circuit
+ *          the create-match flow when the user is already in a match.
+ */
+export const meRoutes = Router();
+meRoutes.get(
+  "/active-match",
+  authenticate,
+  asyncHandler(async (req: any, res) => {
+    const uid = req.user!.userId;
+    const active = await Match.findOne({
+      "teams.players.user": uid,
+      status: { $in: ["draft", "team_setup", "toss", "live"] },
+    })
+      .populate("creator", "username displayName avatar")
+      .lean();
+    ok(res, { active }, MSG.FETCHED("Active match"));
   }),
 );
