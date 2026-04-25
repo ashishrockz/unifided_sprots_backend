@@ -27,11 +27,21 @@ export const NOTIFICATION_TYPES = [
   "admin_announcement", "system",
 ] as const;
 export const SOCKET_EVENTS    = Object.freeze({
-  BALL_BOWLED: "match:ball:bowled", SCORE_UPDATED: "match:score:updated",
-  WICKET: "match:wicket", OVER_COMPLETED: "match:over:completed",
-  INNINGS_COMPLETED: "match:innings:completed", MATCH_COMPLETED: "match:completed",
-  MATCH_ABANDONED: "match:abandoned", BALL_UNDONE: "match:ball:undone",
-  CONFIG_UPDATED: "config:updated",
+  // Match lifecycle
+  MATCH_STARTED: "match:started",
+  MATCH_COMPLETED: "match:completed",
+  MATCH_ABANDONED: "match:abandoned",
+  // Scoring
+  BALL_BOWLED: "match:ball:bowled",
+  SCORE_UPDATED: "match:score:updated",
+  WICKET: "match:wicket",
+  OVER_COMPLETED: "match:over:completed",
+  INNINGS_COMPLETED: "match:innings:completed",
+  BALL_UNDONE: "match:ball:undone",
+  // Toss
+  TOSS_COMPLETED: "toss:completed",
+  TOSS_DECISION: "toss:decision",
+  // Notifications & maintenance
   NOTIFICATION_NEW: "notification:new",
   NOTIFICATION_UNREAD: "notification:unread_count",
   MAINTENANCE_TOGGLED: "maintenance:toggled",

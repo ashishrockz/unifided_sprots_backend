@@ -6,7 +6,7 @@ import{validate}from"../../middleware/validate";
 import{asyncHandler}from"../../utils/asyncHandler";
 import{ok}from"../../utils/response";
 import{AppError}from"../../utils/AppError";
-import{ERRORS,MSG}from"../../constants";
+import{ERRORS,MSG,SOCKET_EVENTS}from"../../constants";
 import{performTossSchema,tossDecisionSchema}from"../matches/matches.validation";
 import{emitToMatch}from"../../socket";
 
@@ -22,8 +22,8 @@ tossRoutes.post("/:matchId/toss",validate(performTossSchema),asyncHandler(async(
   const callerTeam=m.teams.findIndex((t:any)=>t.players.some((p:any)=>p.user?.toString()===calledBy));
   const wonBy=call===result?callerTeam:(callerTeam===0?1:0);
   m.toss={calledBy,call,result,wonBy}as any;m.status="toss";await m.save();
-  emitToMatch(m._id.toString(),"toss:completed",{matchId:m._id,toss:m.toss});
+  emitToMatch(m._id.toString(),SOCKET_EVENTS.TOSS_COMPLETED,{matchId:m._id,toss:m.toss});
   ok(res,m.toss,MSG.TOSS_DONE);
 }));
 tossRoutes.get("/:matchId/toss",asyncHandler(async(req,res)=>{const m=await Match.findById(req.params.matchId).lean();if(!m)throw new AppError(ERRORS.RESOURCE.MATCH_NOT_FOUND);ok(res,m.toss??null,MSG.FETCHED("Toss"));}));
-tossRoutes.post("/:matchId/toss/decision",validate(tossDecisionSchema),asyncHandler(async(req:any,res)=>{const m=await Match.findById(req.params.matchId);if(!m?.toss)throw new AppError(ERRORS.RESOURCE.MATCH_NOT_FOUND);m.toss.decision=req.body.decision;await m.save();emitToMatch(m._id.toString(),"toss:decision",{matchId:m._id,toss:m.toss});ok(res,m.toss,MSG.TOSS_DECISION);}));
+tossRoutes.post("/:matchId/toss/decision",validate(tossDecisionSchema),asyncHandler(async(req:any,res)=>{const m=await Match.findById(req.params.matchId);if(!m?.toss)throw new AppError(ERRORS.RESOURCE.MATCH_NOT_FOUND);m.toss.decision=req.body.decision;await m.save();emitToMatch(m._id.toString(),SOCKET_EVENTS.TOSS_DECISION,{matchId:m._id,toss:m.toss});ok(res,m.toss,MSG.TOSS_DECISION);}));

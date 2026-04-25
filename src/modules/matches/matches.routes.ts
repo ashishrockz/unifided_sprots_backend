@@ -416,7 +416,7 @@ matchRoutes.post(
     m.startedAt = new Date();
     m.lastActivityAt = new Date();
     await m.save();
-    emitToMatch(m._id.toString(), "match:started", { matchId: m._id, teams: m.teams, innings: m.innings[0] });
+    emitToMatch(m._id.toString(), SOCKET_EVENTS.MATCH_STARTED, { matchId: m._id, teams: m.teams, innings: m.innings[0] });
     ok(res, m, MSG.MATCH_STARTED);
   }),
 );
