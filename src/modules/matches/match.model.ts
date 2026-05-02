@@ -16,6 +16,7 @@ export interface IMatch extends Document {
   lastActivityAt: Date; inactivityLimit: number;
   lastBallSnapshot?: any;
   startedAt?: Date; completedAt?: Date;
+  originMatchId?: Types.ObjectId | null;
 }
 
 const ballS = new Schema({ ballNumber: Number, deliveryNumber: Number, batsmanId: Schema.Types.ObjectId, bowlerId: Schema.Types.ObjectId, runs: Number, extras: { type: { type: String }, runs: Number }, totalRuns: Number, isLegal: Boolean, isWicket: Boolean, isBoundary: Boolean, isDotBall: Boolean, wicket: { type: { type: String }, dismissedBatsman: Schema.Types.ObjectId, fielder: Schema.Types.ObjectId }, commentary: String, timestamp: { type: Date, default: Date.now } }, { _id: false });
@@ -43,9 +44,15 @@ const ms = new Schema<IMatch>({
   lastActivityAt: { type: Date, default: Date.now }, inactivityLimit: { type: Number, default: 30 },
   lastBallSnapshot: { type: Schema.Types.Mixed, default: null },
   startedAt: Date, completedAt: Date,
+  originMatchId: { type: Schema.Types.ObjectId, ref: "Match", default: null },
 }, { timestamps: true, optimisticConcurrency: true });
 ms.index({ sportSlug: 1, status: 1 }); ms.index({ creator: 1 }); ms.index({ "teams.players.user": 1, status: 1 });
 ms.index({ location: "2dsphere" });
 // Compound index for auto-abandon worker: find live matches sorted by staleness.
 ms.index({ status: 1, lastActivityAt: 1 });
+// Idempotency guard: only one rematch per (origin, creator) — partial index so non-rematches don't collide on null.
+ms.index(
+  { originMatchId: 1, creator: 1 },
+  { unique: true, partialFilterExpression: { originMatchId: { $type: "objectId" } } },
+);
 export const Match = model<IMatch>("Match", ms);

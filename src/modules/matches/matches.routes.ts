@@ -22,10 +22,13 @@ import {
   setRoleSchema,
   battingOrderSchema,
   abandonSchema,
+  rematchSchema,
 } from "./matches.validation";
 import { emitToMatch } from "../../socket";
 import { SOCKET_EVENTS } from "../../constants";
 import mongoose from "mongoose";
+import { NotificationService } from "../notifications/notification.service";
+import { collectMatchUserIds } from "../scoring/scoring.routes";
 
 export const sportMatchRoutes = Router();
 sportMatchRoutes.post(
@@ -439,6 +442,204 @@ matchRoutes.post(
     ok(res, m, MSG.MATCH_ABANDONED);
   }),
 );
+
+/**
+ * POST /:matchId/rematch
+ * Clone a finished match (completed/abandoned) into a fresh draft.
+ * Modes:
+ *   - same_teams:    keep teams + captain/wk; status = draft (toss-ready)
+ *   - swap_sides:    swap team[0] ↔ team[1]; status = draft
+ *   - shuffle_teams: pool players, randomize, reset roles; status = team_setup
+ *   - new_match:     keep memberships, drop captain/wk; status = team_setup
+ * Idempotent: a partial unique index on (originMatchId, creator) prevents
+ * duplicate rematches; concurrent retry returns the existing rematch.
+ */
+matchRoutes.post(
+  "/:matchId/rematch",
+  validate(rematchSchema),
+  asyncHandler(async (req: any, res) => {
+    const uid = req.user!.userId;
+    const original = await Match.findById(req.params.matchId);
+    if (!original) throw new AppError(ERRORS.RESOURCE.MATCH_NOT_FOUND);
+    if (original.creator.toString() !== uid)
+      throw new AppError(ERRORS.BUSINESS.NOT_MATCH_CREATOR);
+    if (!["completed", "abandoned"].includes(original.status))
+      throw new AppError(ERRORS.BUSINESS.MATCH_NOT_READY);
+
+    // Idempotency short-circuit: if a rematch already exists, return it.
+    const existing = await Match.findOne({
+      originMatchId: original._id,
+      creator: uid,
+    }).lean();
+    if (existing) {
+      ok(res, existing, MSG.FETCHED("Rematch"));
+      return;
+    }
+
+    // Single-active-match invariant for the creator.
+    if (
+      await Match.findOne({
+        "teams.players.user": uid,
+        status: { $in: ["draft", "team_setup", "toss", "live"] },
+      })
+    )
+      throw new AppError(ERRORS.CONFLICT.PLAYER_IN_MATCH);
+
+    const mode = req.body.mode as
+      | "same_teams"
+      | "swap_sides"
+      | "shuffle_teams"
+      | "new_match";
+
+    const origPlain = original.toObject();
+    const teams = buildRematchTeams(
+      origPlain.teams,
+      mode,
+      req.body.team1Name,
+      req.body.team2Name,
+    );
+    const status =
+      mode === "same_teams" || mode === "swap_sides" ? "draft" : "team_setup";
+
+    const matchData: any = {
+      title: origPlain.title.startsWith("Rematch:")
+        ? origPlain.title
+        : `Rematch: ${origPlain.title}`,
+      sportType: origPlain.sportType,
+      sportSlug: origPlain.sportSlug,
+      creator: origPlain.creator,
+      matchConfig: origPlain.matchConfig,
+      teams,
+      guestPlayers: (origPlain.guestPlayers || []).map((g: any) => ({
+        _id: g._id,
+        name: g.name,
+        addedBy: g.addedBy,
+      })),
+      originMatchId: original._id,
+      status,
+    };
+    if (
+      origPlain.location &&
+      Array.isArray(origPlain.location.coordinates) &&
+      origPlain.location.coordinates.length === 2
+    ) {
+      matchData.location = {
+        type: "Point",
+        coordinates: [...origPlain.location.coordinates],
+      };
+    }
+
+    let rematch;
+    try {
+      rematch = await Match.create(matchData);
+    } catch (e: any) {
+      // E11000 — concurrent double-tap; return whichever rematch won the race.
+      if (e?.code === 11000) {
+        const winner = await Match.findOne({
+          originMatchId: original._id,
+          creator: uid,
+        }).lean();
+        if (winner) {
+          ok(res, winner, MSG.FETCHED("Rematch"));
+          return;
+        }
+      }
+      throw e;
+    }
+
+    // Notify other players for non-default modes (skip same_teams to avoid
+    // spam right after match_completed hit the same recipients).
+    if (mode !== "same_teams") {
+      const userIds = collectMatchUserIds(rematch).filter((id) => id !== uid);
+      if (userIds.length > 0) {
+        NotificationService.sendToMany(userIds, {
+          type: "rematch_created",
+          title: "Rematch started",
+          body: `Rematch of ${origPlain.title}`,
+          data: {
+            matchId: rematch._id.toString(),
+            originMatchId: original._id.toString(),
+          },
+        }).catch(() => {});
+      }
+    }
+
+    created(res, rematch, MSG.CREATED("Rematch"));
+  }),
+);
+
+/** Build the teams array for a rematch based on the chosen mode. */
+function buildRematchTeams(
+  origTeams: any[],
+  mode: "same_teams" | "swap_sides" | "shuffle_teams" | "new_match",
+  team1NameOverride?: string,
+  team2NameOverride?: string,
+): any[] {
+  const cloneTeam = (t: any) => ({
+    name: t.name,
+    captain: t.captain || undefined,
+    wicketkeeper: t.wicketkeeper || undefined,
+    players: (t.players || []).map((p: any) => ({
+      user: p.user,
+      role: p.role || "batsman",
+      isGuest: !!p.isGuest,
+      guestName: p.guestName,
+    })),
+    battingOrder: [],
+    bowlingOrder: [],
+  });
+
+  const t0 = cloneTeam(origTeams[0] || {});
+  const t1 = cloneTeam(origTeams[1] || {});
+
+  let result: any[];
+  if (mode === "same_teams") {
+    result = [t0, t1];
+  } else if (mode === "swap_sides") {
+    result = [t1, t0];
+  } else if (mode === "shuffle_teams") {
+    const pool = [...t0.players, ...t1.players];
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    const split = t0.players.length;
+    const reset = (p: any) => ({
+      user: p.user,
+      role: "batsman",
+      isGuest: !!p.isGuest,
+      guestName: p.guestName,
+    });
+    result = [
+      {
+        name: t0.name,
+        captain: undefined,
+        wicketkeeper: undefined,
+        players: pool.slice(0, split).map(reset),
+        battingOrder: [],
+        bowlingOrder: [],
+      },
+      {
+        name: t1.name,
+        captain: undefined,
+        wicketkeeper: undefined,
+        players: pool.slice(split).map(reset),
+        battingOrder: [],
+        bowlingOrder: [],
+      },
+    ];
+  } else {
+    // new_match — keep memberships, drop role assignments
+    result = [
+      { ...t0, captain: undefined, wicketkeeper: undefined },
+      { ...t1, captain: undefined, wicketkeeper: undefined },
+    ];
+  }
+
+  if (team1NameOverride) result[0].name = team1NameOverride;
+  if (team2NameOverride) result[1].name = team2NameOverride;
+  return result;
+}
 
 /**
  * GET /me/active-match

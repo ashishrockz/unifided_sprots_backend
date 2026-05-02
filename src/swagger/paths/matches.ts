@@ -519,6 +519,69 @@
  *         description: Match already completed/abandoned
  *       403:
  *         description: Not the match creator
+ *
+ * /matches/{matchId}/rematch:
+ *   post:
+ *     tags: [Matches]
+ *     summary: Create a rematch from a finished match
+ *     description: |
+ *       Clones a `completed` or `abandoned` match into a fresh draft so the
+ *       host can run it back without rebuilding the roster.
+ *
+ *       **Modes:**
+ *       - `same_teams` — exact lineup, status `draft` (toss-ready)
+ *       - `swap_sides` — swap Team A ↔ Team B, status `draft`
+ *       - `shuffle_teams` — pool players, randomize, drop captain/wicketkeeper, status `team_setup`
+ *       - `new_match` — keep memberships but drop captain/wicketkeeper, status `team_setup`
+ *
+ *       **Idempotency:** a partial unique index on `(originMatchId, creator)`
+ *       ensures double-tap is safe — concurrent requests both yield the same
+ *       rematch document.
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: matchId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [mode]
+ *             properties:
+ *               mode:
+ *                 type: string
+ *                 enum: [same_teams, swap_sides, shuffle_teams, new_match]
+ *               team1Name:
+ *                 type: string
+ *                 maxLength: 30
+ *               team2Name:
+ *                 type: string
+ *                 maxLength: 30
+ *     responses:
+ *       201:
+ *         description: Rematch created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data: { $ref: '#/components/schemas/Match' }
+ *       200:
+ *         description: Existing rematch returned (idempotent path)
+ *       403:
+ *         description: Not the match creator
+ *       404:
+ *         description: Original match not found
+ *       409:
+ *         description: Creator already has an active match
+ *       422:
+ *         description: Original match is not yet finished
  */
 
 export {};

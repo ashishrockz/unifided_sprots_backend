@@ -131,3 +131,12 @@ export const inningsSetupSchema = z.object({
 export const abandonSchema = z.object({
   reason: z.string().max(200).optional(),
 });
+
+/** POST /matches/:matchId/rematch — Clone a finished match into a fresh one */
+export const rematchSchema = z.object({
+  mode: z.enum(["same_teams", "swap_sides", "shuffle_teams", "new_match"], {
+    errorMap: () => ({ message: "Mode must be one of: same_teams, swap_sides, shuffle_teams, new_match" }),
+  }),
+  team1Name: z.string().min(1).max(30).trim().optional(),
+  team2Name: z.string().min(1).max(30).trim().optional(),
+});

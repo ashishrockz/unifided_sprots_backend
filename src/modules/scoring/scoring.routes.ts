@@ -27,7 +27,7 @@ function isCreatorOrPlayer(match: any, userId: string): boolean {
 }
 
 /** Collect unique non-guest player user IDs (plus creator) for notifications. */
-function collectMatchUserIds(match: any): string[] {
+export function collectMatchUserIds(match: any): string[] {
   const ids = new Set<string>();
   if (match.creator) ids.add(match.creator.toString());
   for (const t of match.teams) {
